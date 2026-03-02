@@ -393,6 +393,9 @@
   const rsctx = rulerStaticCanvas.getContext("2d");
   const msctx = melodyStaticCanvas.getContext("2d");
   const csctx = chordStaticCanvas.getContext("2d");
+  let prevPlayheadXRuler = null;
+  let prevPlayheadXMelody = null;
+  let prevPlayheadXChord = null;
 
   const melodyScroll = document.getElementById("melodyScroll");
   const rulerScroll  = document.getElementById("rulerScroll");
@@ -1412,6 +1415,47 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     rctx.setLineDash([]);
   }
 
+  function restoreStripe(ctx, srcCanvas, x, h){
+    const pad = 6;
+    const sx = Math.max(0, Math.floor(x - pad));
+    const sw = Math.min(srcCanvas.width - sx, pad * 2 + 1);
+    if (sw <= 0) return;
+    ctx.drawImage(srcCanvas, sx, 0, sw, h, sx, 0, sw, h);
+  }
+
+  function drawPlayheadLine(ctx, x, h){
+    if (isPlaying){
+      ctx.strokeStyle = "rgba(56,189,248,0.90)";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+    } else {
+      ctx.strokeStyle = "rgba(255,255,255,0.72)";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8,6]);
+    }
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, h);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function drawPlayheadsOnlyFast(){
+    const x = isPlaying ? stepToX(playStepFloat % TOTAL_STEPS) : stepToX(stepCursor);
+
+    if (prevPlayheadXRuler != null) restoreStripe(rctx, rulerStaticCanvas, prevPlayheadXRuler, rulerCanvas.height);
+    drawPlayheadLine(rctx, x, rulerCanvas.height);
+    prevPlayheadXRuler = x;
+
+    if (prevPlayheadXMelody != null) restoreStripe(mctx, melodyStaticCanvas, prevPlayheadXMelody, melodyCanvas.height);
+    drawPlayheadLine(mctx, x, melodyCanvas.height);
+    prevPlayheadXMelody = x;
+
+    if (prevPlayheadXChord != null) restoreStripe(cctx, chordStaticCanvas, prevPlayheadXChord, chordCanvas.height);
+    drawPlayheadLine(cctx, x, chordCanvas.height);
+    prevPlayheadXChord = x;
+  }
+
   function renderPitchSidebar(){
     const h = pitchCanvas.height;
     const w = pitchCanvas.width;
@@ -1611,6 +1655,9 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     renderRulerStatic();
     renderMelodyStatic();
     renderChordsStatic();
+    prevPlayheadXRuler = null;
+    prevPlayheadXMelody = null;
+    prevPlayheadXChord = null;
     drawDynamicOverlayOnly();
   }
 
@@ -2928,7 +2975,7 @@ renderAll();
 
     if (ui.follow) followScrollToX(stepToX(s));
 
-    drawDynamicOverlayOnly();
+    drawPlayheadsOnlyFast();
     if (isPlaying && !document.hidden) rafId = requestAnimationFrame(tickUI);
   }
 
