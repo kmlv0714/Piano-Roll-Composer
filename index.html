@@ -387,6 +387,12 @@
   const mctx = melodyCanvas.getContext("2d");
   const cctx = chordCanvas.getContext("2d");
   const pctx = pitchCanvas.getContext("2d");
+  const rulerStaticCanvas = document.createElement("canvas");
+  const melodyStaticCanvas = document.createElement("canvas");
+  const chordStaticCanvas = document.createElement("canvas");
+  const rsctx = rulerStaticCanvas.getContext("2d");
+  const msctx = melodyStaticCanvas.getContext("2d");
+  const csctx = chordStaticCanvas.getContext("2d");
 
   const melodyScroll = document.getElementById("melodyScroll");
   const rulerScroll  = document.getElementById("rulerScroll");
@@ -819,6 +825,13 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     rulerCanvas.width  = melodyCanvas.width;
     chordCanvas.width  = Math.max(1, TOTAL_STEPS * ui.pxPerStep);
     pitchCanvas.width  = 100;
+
+    rulerStaticCanvas.width = rulerCanvas.width;
+    rulerStaticCanvas.height = rulerCanvas.height;
+    melodyStaticCanvas.width = melodyCanvas.width;
+    melodyStaticCanvas.height = melodyCanvas.height;
+    chordStaticCanvas.width = chordCanvas.width;
+    chordStaticCanvas.height = chordCanvas.height;
   }
 
   function viewBottomMidi(){ return viewTopMidi - (VIEW_ROWS - 1); }
@@ -1228,7 +1241,7 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
   }
 
   // ======== RENDER ========
-  function drawGrid(ctx, w, h, isMelody){
+  function drawGrid(ctx, w, h, isMelody, showPlayhead, showCursor){
     ctx.clearRect(0,0,w,h);
     ctx.fillStyle = "rgba(0,0,0,0.22)";
     ctx.fillRect(0,0,w,h);
@@ -1262,13 +1275,13 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
       }
     }
 
-    if (isPlaying){
+    if (showPlayhead && isPlaying){
       const x = stepToX(playStepFloat % TOTAL_STEPS);
       ctx.strokeStyle = "rgba(56,189,248,0.90)";
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
     }
-        if (!isPlaying){
+    if (showCursor && !isPlaying){
       const x = stepToX(stepCursor);
       ctx.strokeStyle = "rgba(255,255,255,0.70)";
       ctx.lineWidth = 2;
@@ -1278,42 +1291,67 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     }
   }
 
+  function drawPlayCursorLines(ctx, h){
+    if (isPlaying){
+      const x = stepToX(playStepFloat % TOTAL_STEPS);
+      ctx.strokeStyle = "rgba(56,189,248,0.90)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+      return;
+    }
+    const x = stepToX(stepCursor);
+    ctx.strokeStyle = "rgba(255,255,255,0.70)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8,6]);
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, h);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
 
-  function renderRuler(){
-    const w = rulerCanvas.width, h = rulerCanvas.height;
-    rctx.clearRect(0,0,w,h);
-    rctx.fillStyle = "rgba(0,0,0,0.20)";
-    rctx.fillRect(0,0,w,h);
+
+  function renderRulerStatic(){
+    const w = rulerStaticCanvas.width, h = rulerStaticCanvas.height;
+    rsctx.clearRect(0,0,w,h);
+    rsctx.fillStyle = "rgba(0,0,0,0.20)";
+    rsctx.fillRect(0,0,w,h);
 
     // bar blocks
     for (let b=0; b<TOTAL_BARS; b++){
       const x0 = stepToX(b * STEPS_PER_BAR);
       const x1 = stepToX((b+1) * STEPS_PER_BAR);
-      rctx.fillStyle = (b%2===0) ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.01)";
-      rctx.fillRect(x0, 0, x1-x0, h);
+      rsctx.fillStyle = (b%2===0) ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.01)";
+      rsctx.fillRect(x0, 0, x1-x0, h);
 
       // bar line
-      rctx.strokeStyle = "rgba(160,190,255,0.22)";
-      rctx.lineWidth = 2;
-      rctx.beginPath(); rctx.moveTo(x0+0.5, 0); rctx.lineTo(x0+0.5, h); rctx.stroke();
+      rsctx.strokeStyle = "rgba(160,190,255,0.22)";
+      rsctx.lineWidth = 2;
+      rsctx.beginPath(); rsctx.moveTo(x0+0.5, 0); rsctx.lineTo(x0+0.5, h); rsctx.stroke();
 
       // label
-      rctx.fillStyle = "rgba(220,235,255,0.85)";
-      rctx.font = "800 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace";
-      rctx.textBaseline = "middle";
-      rctx.fillText(String(b+1), x0 + 8, h/2);
+      rsctx.fillStyle = "rgba(220,235,255,0.85)";
+      rsctx.font = "800 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace";
+      rsctx.textBaseline = "middle";
+      rsctx.fillText(String(b+1), x0 + 8, h/2);
     }
 
     // minor ticks (beats)
-    rctx.strokeStyle = "rgba(160,190,255,0.14)";
-    rctx.lineWidth = 1;
+    rsctx.strokeStyle = "rgba(160,190,255,0.14)";
+    rsctx.lineWidth = 1;
     for (let s=0; s<=TOTAL_STEPS; s+=4){
       const x = stepToX(s)+0.5;
       const tall = (s % STEPS_PER_BAR === 0) ? h : (s % 8 === 0 ? h*0.72 : h*0.55);
-      rctx.beginPath(); rctx.moveTo(x, h); rctx.lineTo(x, h - tall); rctx.stroke();
+      rsctx.beginPath(); rsctx.moveTo(x, h); rsctx.lineTo(x, h - tall); rsctx.stroke();
     }
+  }
 
-    // cursor / playhead
+  function drawRulerPlayhead(){
+    rctx.clearRect(0,0,rulerCanvas.width,rulerCanvas.height);
+    rctx.drawImage(rulerStaticCanvas, 0, 0);
     const x = isPlaying ? stepToX(playStepFloat % TOTAL_STEPS) : stepToX(stepCursor);
     rctx.strokeStyle = isPlaying ? "rgba(56,189,248,0.95)" : "rgba(255,255,255,0.72)";
     rctx.lineWidth = 2;
@@ -1385,7 +1423,7 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     pctx.stroke();
   }
 
-  function drawNote(n){
+  function drawNote(ctx, n, scalePCs){
     if (n.midi > viewTopMidi || n.midi < viewBottomMidi()) return;
 
     const x0 = stepToX(n.step);
@@ -1393,7 +1431,6 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     const y = midiToY(n.midi);
     const h = noteH();
 
-    const scalePCs = getSelectedScalePCs();
     const segs = ui.toggles.assist ? splitByChord(n.step, n.dur) : [{step:n.step,dur:n.dur}];
 
     for (const seg of segs){
@@ -1405,22 +1442,23 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
       const sx0 = stepToX(seg.step);
       const sw  = Math.max(6, stepToX(seg.step + seg.dur) - sx0);
 
-      mctx.fillStyle = fill;
-      roundRect(mctx, sx0, y+1, sw, h-2, 10);
-      mctx.fill();
+      ctx.fillStyle = fill;
+      roundRect(ctx, sx0, y+1, sw, h-2, 10);
+      ctx.fill();
     }
 
-    mctx.strokeStyle = mel.sel.set.has(n) ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.22)";
-    mctx.lineWidth = mel.sel.set.has(n) ? 2 : 1;
-    roundRect(mctx, x0, y+1, w, h-2, 10);
-    mctx.stroke();
+    ctx.strokeStyle = mel.sel.set.has(n) ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.22)";
+    ctx.lineWidth = mel.sel.set.has(n) ? 2 : 1;
+    roundRect(ctx, x0, y+1, w, h-2, 10);
+    ctx.stroke();
 
-    mctx.fillStyle = "rgba(255,255,255,0.26)";
-    mctx.fillRect(x0 + w - 6, y+3, 4, h-6);
+    ctx.fillStyle = "rgba(255,255,255,0.26)";
+    ctx.fillRect(x0 + w - 6, y+3, 4, h-6);
   }
 
-  function renderMelody(){
-    drawGrid(mctx, melodyCanvas.width, melodyCanvas.height, true);
+  function renderMelodyStatic(){
+    drawGrid(msctx, melodyStaticCanvas.width, melodyStaticCanvas.height, true, false, false);
+    const scalePCs = getSelectedScalePCs();
 
     if (ui.toggles.chordTones && chords.length){
       for (const c of chords){
@@ -1433,8 +1471,8 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
           const pc = ((midi%12)+12)%12;
           if (info.tones.includes(pc)){
             const y = i * rowH();
-            mctx.fillStyle = "rgba(170,180,200,0.10)";
-            mctx.fillRect(x0, y, (x1-x0), rowH());
+            msctx.fillStyle = "rgba(170,180,200,0.10)";
+            msctx.fillRect(x0, y, (x1-x0), rowH());
           }
         }
       }
@@ -1445,65 +1483,83 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
       for (const midi of activeMidiNotes){
         if (midi > viewTopMidi || midi < viewBottomMidi()) continue;
         const y = midiToY(midi);
-        mctx.fillStyle = "rgba(56,189,248,0.10)";
-        mctx.fillRect(0, y, melodyCanvas.width, rowH());
+        msctx.fillStyle = "rgba(56,189,248,0.10)";
+        msctx.fillRect(0, y, melodyStaticCanvas.width, rowH());
       }
     }
 
-    for (const n of notes) drawNote(n);
-
-    if (mel.sel.active) drawSelectionRect(mctx, mel.sel.rect);
-    if (mel.drag.ghost) drawGhostRect(mctx, mel.drag.ghost);
+    for (const n of notes) drawNote(msctx, n, scalePCs);
 
     renderPitchSidebar();
   }
 
-  function drawChordBlock(c){
+  function drawMelodyDynamic(){
+    mctx.clearRect(0, 0, melodyCanvas.width, melodyCanvas.height);
+    mctx.drawImage(melodyStaticCanvas, 0, 0);
+    if (mel.sel.active) drawSelectionRect(mctx, mel.sel.rect);
+    if (mel.drag.ghost) drawGhostRect(mctx, mel.drag.ghost);
+    drawPlayCursorLines(mctx, melodyCanvas.height);
+  }
+
+  function drawChordBlock(ctx, c, scalePCs){
     const x0 = stepToX(c.start);
     const w = Math.max(10, stepToX(c.start + c.dur) - x0);
     const y = 10;
     const h = chordCanvas.height - 20;
 
-    const scalePCs = getSelectedScalePCs();
     const fits = chordFitsScale(c.chord, scalePCs);
 
-    cctx.fillStyle = fits ? "rgba(34,197,94,0.18)" : "rgba(124,58,237,0.20)";
-    roundRect(cctx, x0, y, w, h, 12);
-    cctx.fill();
+    ctx.fillStyle = fits ? "rgba(34,197,94,0.18)" : "rgba(124,58,237,0.20)";
+    roundRect(ctx, x0, y, w, h, 12);
+    ctx.fill();
 
-    cctx.strokeStyle = cho.sel.set.has(c)
+    ctx.strokeStyle = cho.sel.set.has(c)
       ? "rgba(255,255,255,0.70)"
       : (fits ? "rgba(34,197,94,0.48)" : "rgba(255,255,255,0.18)");
-    cctx.lineWidth = cho.sel.set.has(c) ? 2 : 1;
-    roundRect(cctx, x0, y, w, h, 12);
-    cctx.stroke();
+    ctx.lineWidth = cho.sel.set.has(c) ? 2 : 1;
+    roundRect(ctx, x0, y, w, h, 12);
+    ctx.stroke();
 
-    cctx.fillStyle = "rgba(255,255,255,0.92)";
-    cctx.font = "900 13px ui-sans-serif,system-ui";
-    cctx.fillText(c.chord, x0 + 10, y + 20);
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.font = "900 13px ui-sans-serif,system-ui";
+    ctx.fillText(c.chord, x0 + 10, y + 20);
 
     const rn = chordRomanLabel(c.chord);
     if (rn){
-      cctx.fillStyle = "rgba(255,255,255,0.62)";
-      cctx.font = "800 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace";
-      cctx.fillText(rn, x0 + 10 + cctx.measureText(c.chord).width + 10, y + 20);
+      ctx.fillStyle = "rgba(255,255,255,0.62)";
+      ctx.font = "800 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace";
+      ctx.fillText(rn, x0 + 10 + ctx.measureText(c.chord).width + 10, y + 20);
     }
 
-    cctx.fillStyle = "rgba(255,255,255,0.22)";
-    cctx.fillRect(x0 + w - 6, y+6, 4, h-12);
+    ctx.fillStyle = "rgba(255,255,255,0.22)";
+    ctx.fillRect(x0 + w - 6, y+6, 4, h-12);
   }
 
-  function renderChords(){
-    drawGrid(cctx, chordCanvas.width, chordCanvas.height, false);
-    for (const c of chords) drawChordBlock(c);
+  function renderChordsStatic(){
+    drawGrid(csctx, chordStaticCanvas.width, chordStaticCanvas.height, false, false, false);
+    const scalePCs = getSelectedScalePCs();
+    for (const c of chords) drawChordBlock(csctx, c, scalePCs);
+  }
+
+  function drawChordsDynamic(){
+    cctx.clearRect(0, 0, chordCanvas.width, chordCanvas.height);
+    cctx.drawImage(chordStaticCanvas, 0, 0);
     if (cho.sel.active) drawSelectionRect(cctx, cho.sel.rect);
     if (cho.drag.ghost) drawGhostRect(cctx, cho.drag.ghost);
+    drawPlayCursorLines(cctx, chordCanvas.height);
+  }
+
+  function drawDynamicOverlayOnly(){
+    drawRulerPlayhead();
+    drawMelodyDynamic();
+    drawChordsDynamic();
   }
 
   function renderAll(){
-    renderRuler();
-    renderMelody();
-    renderChords();
+    renderRulerStatic();
+    renderMelodyStatic();
+    renderChordsStatic();
+    drawDynamicOverlayOnly();
   }
 
   // ======== HIT TEST + INTERACTION ========
@@ -2790,7 +2846,7 @@ renderAll();
 
     if (ui.follow) followScrollToX(stepToX(s));
 
-    renderAll();
+    drawDynamicOverlayOnly();
     if (isPlaying) rafId = requestAnimationFrame(tickUI);
   }
 
