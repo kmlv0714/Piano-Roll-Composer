@@ -498,6 +498,7 @@
   let playStepFloat = 0;
   let rafId = null;
   let lastUiTs = 0;
+  let pitchRafId = null;
 
   // ===== scroll usability flags =====
   let syncingScroll = false;
@@ -620,15 +621,15 @@
     try { if (polyChord) polyChord.dispose(); } catch(e){}
     // Limit voices to prevent unbounded OscillatorNode growth
     polyLead = new Tone.PolySynth({
-      maxPolyphony: 8,
+      maxPolyphony: 16,
       voice: Tone.Synth,
-      options: { oscillator:{ type: oscType }, envelope:{ attack:0.005, decay:0.08, sustain:0.4, release:0.12 } }
+      options: { oscillator:{ type: oscType }, envelope:{ attack:0.005, decay:0.08, sustain:0.35, release:0.08 } }
     }).toDestination();
 
     polyChord = new Tone.PolySynth({
-      maxPolyphony: 12,
+      maxPolyphony: 20,
       voice: Tone.Synth,
-      options: { oscillator:{ type: "sawtooth" }, envelope:{ attack:0.01, decay:0.12, sustain:0.35, release:0.18 } }
+      options: { oscillator:{ type: "sawtooth" }, envelope:{ attack:0.01, decay:0.12, sustain:0.3, release:0.12 } }
     }).toDestination();
   }
   rebuildPolySynths();
@@ -2641,7 +2642,8 @@ function hitNote(mx,my){
     pitchRequiredStableMs = 120;
 
 
-    requestAnimationFrame(pitchDetectLoop);
+    if (pitchRafId) cancelAnimationFrame(pitchRafId);
+    pitchRafId = requestAnimationFrame(pitchDetectLoop);
     setStatus("Pitch highlight enabled");
   }
 
@@ -2658,6 +2660,10 @@ function hitNote(mx,my){
     pitchStream = null;
     pitchAnalyser = null;
     pitchBuf = null;
+    if (pitchRafId){
+      cancelAnimationFrame(pitchRafId);
+      pitchRafId = null;
+    }
   }
 
   function freqToMidi(freq){
@@ -2719,6 +2725,10 @@ function hitNote(mx,my){
 
   function pitchDetectLoop(){
     if (!pitchMode || !pitchAnalyser || !pitchBuf) return;
+    if (document.hidden){
+      pitchRafId = null;
+      return;
+    }
 
     pitchAnalyser.getFloatTimeDomainData(pitchBuf);
     const ctx = getSharedAudioContext();
@@ -2759,7 +2769,7 @@ function hitNote(mx,my){
       pitchPrevRenderMidi = pitchHighlightedMidi;
       renderAll();
     }
-    requestAnimationFrame(pitchDetectLoop);
+    pitchRafId = requestAnimationFrame(pitchDetectLoop);
   }
 
 
@@ -2773,7 +2783,7 @@ function hitNote(mx,my){
     isPlaying = true;
     posMelody.classList.add("playing");
     posChords.classList.add("playing");
-    rafId = requestAnimationFrame(tickUI);
+    if (!document.hidden) rafId = requestAnimationFrame(tickUI);
     setStatus("Playing");
   });
 
@@ -2788,6 +2798,27 @@ function hitNote(mx,my){
     rafId = null;
     renderAll();
     setStatus("Stopped");
+  });
+
+  document.addEventListener("visibilitychange", ()=>{
+    if (document.hidden){
+      if (rafId){
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      if (pitchRafId){
+        cancelAnimationFrame(pitchRafId);
+        pitchRafId = null;
+      }
+      return;
+    }
+
+    if (isPlaying && !rafId){
+      rafId = requestAnimationFrame(tickUI);
+    }
+    if (pitchMode && pitchAnalyser && pitchBuf && !pitchRafId){
+      pitchRafId = requestAnimationFrame(pitchDetectLoop);
+    }
   });
 
   // Spacebar: toggle Play/Stop (ignore when typing in inputs)
@@ -2883,7 +2914,7 @@ renderAll();
   function tickUI(ts){
     const nowTs = ts ?? performance.now();
     if (nowTs - lastUiTs < 33){
-      if (isPlaying) rafId = requestAnimationFrame(tickUI);
+      if (isPlaying && !document.hidden) rafId = requestAnimationFrame(tickUI);
       return;
     }
     lastUiTs = nowTs;
@@ -2898,7 +2929,7 @@ renderAll();
     if (ui.follow) followScrollToX(stepToX(s));
 
     drawDynamicOverlayOnly();
-    if (isPlaying) rafId = requestAnimationFrame(tickUI);
+    if (isPlaying && !document.hidden) rafId = requestAnimationFrame(tickUI);
   }
 
   // ======== AUDIO BUILD ========
@@ -3256,6 +3287,7 @@ function isTransportPlaying() {
   let acc = 0;
   let last = performance.now();
   let prevMode = 'idle';
+  let mascotRafId = null;
 
   // Animation speed:
   // at 120 BPM -> about 6 fps (slower than before), and scales with tempo.
@@ -3305,10 +3337,28 @@ function isTransportPlaying() {
       ctx.drawImage(img, fx, 0, frameW, frameH, 0, 0, 128, 128);
     }
 
-    requestAnimationFrame(tick);
+    mascotRafId = requestAnimationFrame(tick);
   }
 
-  requestAnimationFrame(tick);
+  function startMascotLoop(){
+    if (mascotRafId != null) return;
+    if (document.hidden) return;
+    last = performance.now();
+    mascotRafId = requestAnimationFrame(tick);
+  }
+
+  function stopMascotLoop(){
+    if (mascotRafId == null) return;
+    cancelAnimationFrame(mascotRafId);
+    mascotRafId = null;
+  }
+
+  document.addEventListener("visibilitychange", ()=>{
+    if (document.hidden) stopMascotLoop();
+    else startMascotLoop();
+  });
+
+  startMascotLoop();
 })();
 </script>
 
