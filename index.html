@@ -643,6 +643,16 @@
 
   let __repeatId = null;
   let __stepCursor = 0;
+  const __lastScheduledByVoice = Object.create(null);
+
+  function safeScheduleTime(voiceKey, proposedTime){
+    const eps = 0.0002;
+    const nowFloor = Tone.now() + 0.001;
+    const last = __lastScheduledByVoice[voiceKey] ?? -Infinity;
+    const t = Math.max(proposedTime, last + eps, nowFloor);
+    __lastScheduledByVoice[voiceKey] = t;
+    return t;
+  }
 
   function __triggerStep(time){
     // UI (playhead etc.) should stay on RAF thread; just schedule audio here.
@@ -655,8 +665,9 @@
       const durSteps = Math.max(1, n.dur|0);
       const durSec = Math.max(0.02, Tone.Time(stepToTime(durSteps)).toSeconds() - 0.01);
       try { markSoundActivity(); } catch(e) {}
-      polyLead.triggerAttackRelease(Tone.Frequency(n.midi,"midi").toFrequency(), durSec, t, n.vel ?? 0.9);
-      t += 0.0001;
+      const tt = safeScheduleTime("lead", t);
+      polyLead.triggerAttackRelease(Tone.Frequency(n.midi,"midi").toFrequency(), durSec, tt, n.vel ?? 0.9);
+      t = tt + 0.0001;
     }
 
     // Chords at this step
@@ -669,22 +680,43 @@
         const freqs = mids.map(m=>Tone.Frequency(m,"midi").toFrequency());
         const durSec = Math.max(0.03, Tone.Time(stepToTime(Math.max(1,c.dur|0))).toSeconds() - 0.01);
         try { markSoundActivity(); } catch(e) {}
-        polyChord.triggerAttackRelease(freqs, durSec, t, 0.6);
-        t += 0.0001;
+        const tt = safeScheduleTime("chord", t);
+        polyChord.triggerAttackRelease(freqs, durSec, tt, 0.6);
+        t = tt + 0.0001;
       }
     }
 
     // Drums pattern (same as original)
     if (ui.toggles.drums){
       const inBar = __stepCursor % STEPS_PER_BAR;
+      const stepDurSec = Math.max(0.02, Tone.Time("16n").toSeconds());
+      const drumDur = Math.max(0.01, stepDurSec * 0.82);
       try { markSoundActivity(); } catch(e) {}
-      hat.triggerAttackRelease("16n", t, (inBar%2===0)?0.35:0.25); t += 0.0001;
-      if (inBar===0 || inBar===6 || inBar===8 || inBar===14) { kick.triggerAttackRelease("C1","16n",t,0.9); t += 0.0001; }
-      if (inBar===4 || inBar===12) { snare.triggerAttackRelease("16n",t,0.6); t += 0.0001; }
-      if (__stepCursor===0) { crash.triggerAttackRelease("8n",t,0.55); t += 0.0001; }
+      {
+        const tt = safeScheduleTime("hat", t);
+        hat.triggerAttackRelease(drumDur, tt, (inBar%2===0)?0.35:0.25);
+        t = tt + 0.0001;
+      }
+      if (inBar===0 || inBar===6 || inBar===8 || inBar===14) {
+        const tt = safeScheduleTime("kick", t);
+        kick.triggerAttackRelease("C1", drumDur, tt, 0.9);
+        t = tt + 0.0001;
+      }
+      if (inBar===4 || inBar===12) {
+        const tt = safeScheduleTime("snare", t);
+        snare.triggerAttackRelease(drumDur, tt, 0.6);
+        t = tt + 0.0001;
+      }
+      if (__stepCursor===0) {
+        const tt = safeScheduleTime("crash", t);
+        crash.triggerAttackRelease(Math.max(0.03, stepDurSec * 1.6), tt, 0.55);
+        t = tt + 0.0001;
+      }
       const lastBarStart = (TOTAL_BARS-1) * STEPS_PER_BAR;
       if (__stepCursor>=lastBarStart && inBar>=8 && inBar%2===0){
-        tom.triggerAttackRelease((inBar<12)?"C2":"G2","16n",t,0.55); t += 0.0001;
+        const tt = safeScheduleTime("tom", t);
+        tom.triggerAttackRelease((inBar<12)?"C2":"G2", drumDur, tt, 0.55);
+        t = tt + 0.0001;
       }
     }
 
@@ -707,6 +739,7 @@
     Tone.Transport.cancel(0);
 
     __stepCursor = 0;
+    for (const k in __lastScheduledByVoice) delete __lastScheduledByVoice[k];
     __repeatId = Tone.Transport.scheduleRepeat(__triggerStep, "16n");
     Tone.Transport.start("+0.02");
   }
