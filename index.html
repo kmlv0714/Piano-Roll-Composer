@@ -490,6 +490,8 @@
   let pitchLastTimeMs = null;
   let pitchRequiredStableMs = 120; // ms
   let pitchPrevRenderMidi = null;
+  let pitchSampleRate = 44100;
+  let sharedAudioContextRef = null;
 
 
   // Step-input (keyboard-driven) mode
@@ -2606,15 +2608,22 @@ function hitNote(mx,my){
 
   // --- Mic pitch highlight UI ---
   function getSharedAudioContext(){
+    if (sharedAudioContextRef) return sharedAudioContextRef;
     // Prefer Tone.js context to avoid multiple contexts fighting autoplay policy.
     try{
-      if (Tone && Tone.getContext){
-        const tc = Tone.getContext();
-        return tc.rawContext || tc._context || tc.context || tc;
+      const T = window.Tone;
+      if (T && T.getContext){
+        const tc = T.getContext();
+        sharedAudioContextRef = tc.rawContext || tc._context || tc.context || tc;
+        return sharedAudioContextRef;
       }
-      if (Tone && Tone.context) return Tone.context.rawContext || Tone.context._context || Tone.context;
+      if (T && T.context){
+        sharedAudioContextRef = T.context.rawContext || T.context._context || T.context;
+        return sharedAudioContextRef;
+      }
     }catch(e){}
-    return new (window.AudioContext || window.webkitAudioContext)();
+    sharedAudioContextRef = new (window.AudioContext || window.webkitAudioContext)();
+    return sharedAudioContextRef;
   }
 
   function updatePitchUI(){
@@ -2679,6 +2688,7 @@ function hitNote(mx,my){
     pitchAnalyser = ctx.createAnalyser();
     pitchAnalyser.fftSize = 2048;
     pitchAnalyser.smoothingTimeConstant = 0.0;
+    pitchSampleRate = ctx.sampleRate || 44100;
 
     src.connect(pitchAnalyser);
     pitchBuf = new Float32Array(pitchAnalyser.fftSize);
@@ -2778,8 +2788,7 @@ function hitNote(mx,my){
     }
 
     pitchAnalyser.getFloatTimeDomainData(pitchBuf);
-    const ctx = getSharedAudioContext();
-    const freq = autoCorrelatePitch(pitchBuf, ctx.sampleRate);
+    const freq = autoCorrelatePitch(pitchBuf, pitchSampleRate);
 
     if (freq > 0){
       const midi = freqToMidi(freq);
