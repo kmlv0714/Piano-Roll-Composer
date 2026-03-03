@@ -1464,6 +1464,7 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
   function drawRulerPlayhead(){
     rctx.clearRect(0,0,rulerCanvas.width,rulerCanvas.height);
     rctx.drawImage(rulerStaticCanvas, 0, 0);
+    const h = rulerCanvas.height;
     const x = isPlaying ? stepToX(playStepFloat % TOTAL_STEPS) : stepToX(stepCursor);
     rctx.strokeStyle = isPlaying ? "rgba(56,189,248,0.95)" : "rgba(255,255,255,0.72)";
     rctx.lineWidth = 2;
