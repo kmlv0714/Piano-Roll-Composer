@@ -628,13 +628,13 @@
     try { if (polyChord) polyChord.dispose(); } catch(e){}
     // Limit voices to prevent unbounded OscillatorNode growth
     polyLead = new Tone.PolySynth({
-      maxPolyphony: 16,
+      maxPolyphony: 24,
       voice: Tone.Synth,
       options: { oscillator:{ type: oscType }, envelope:{ attack:0.005, decay:0.08, sustain:0.35, release:0.08 } }
     }).toDestination();
 
     polyChord = new Tone.PolySynth({
-      maxPolyphony: 20,
+      maxPolyphony: 28,
       voice: Tone.Synth,
       options: { oscillator:{ type: "sawtooth" }, envelope:{ attack:0.01, decay:0.12, sustain:0.3, release:0.12 } }
     }).toDestination();
@@ -652,10 +652,6 @@
   let __repeatId = null;
   let __stepCursor = 0;
   const __lastScheduledByVoice = Object.create(null);
-  const __leadVoiceEnds = [];
-  const __chordVoiceEnds = [];
-  const __LEAD_SOFT_LIMIT = 12;   // below maxPolyphony(16)
-  const __CHORD_SOFT_LIMIT = 16;  // below maxPolyphony(20)
 
   function safeScheduleTime(voiceKey, proposedTime){
     const eps = 0.0002;
@@ -666,29 +662,12 @@
     return t;
   }
 
-  function pruneVoiceEnds(arr, atTime){
-    let w = 0;
-    for (let i=0;i<arr.length;i++){
-      if (arr[i] > atTime) arr[w++] = arr[i];
-    }
-    arr.length = w;
-  }
-
-  function canReserveVoices(arr, atTime, reserveCount, softLimit){
-    pruneVoiceEnds(arr, atTime);
-    return (arr.length + reserveCount) <= softLimit;
-  }
-
-  function reserveVoices(arr, endTime, count){
-    for (let i=0;i<count;i++) arr.push(endTime);
-  }
-
   function __triggerStep(time){
     compactNotesIfNeeded();
     const stepDurSec = Math.max(0.02, Tone.Time("16n").toSeconds());
     const now = Tone.now();
     // If callback is late, skip this step instead of sounding audibly behind the grid.
-    const lateLimitSec = Math.max(0.012, stepDurSec * 0.35);
+    const lateLimitSec = Math.max(0.08, stepDurSec * 1.8);
     if (time < (now - lateLimitSec)){
       __stepCursor = (__stepCursor + 1) % TOTAL_STEPS;
       return;
@@ -697,7 +676,7 @@
     // UI (playhead etc.) should stay on RAF thread; just schedule audio here.
     let t = time;
     let leadScheduled = 0;
-    const MAX_LEAD_TRIGGERS_PER_STEP = 12;
+    const MAX_LEAD_TRIGGERS_PER_STEP = 32;
 
     // Melody notes at this step
     for (let i=0;i<notes.length;i++){
@@ -708,10 +687,8 @@
       const durSteps = Math.max(1, n.dur|0);
       const durSec = Math.max(0.02, Tone.Time(stepToTime(durSteps)).toSeconds() - 0.01);
       try { markSoundActivity(); } catch(e) {}
-      if (!canReserveVoices(__leadVoiceEnds, t, 1, __LEAD_SOFT_LIMIT)) continue;
       const tt = safeScheduleTime("lead", t);
       polyLead.triggerAttackRelease(Tone.Frequency(n.midi,"midi").toFrequency(), durSec, tt, n.vel ?? 0.9);
-      reserveVoices(__leadVoiceEnds, tt + durSec, 1);
       t = tt + 0.0001;
       leadScheduled++;
     }
@@ -726,10 +703,8 @@
         const freqs = mids.map(m=>Tone.Frequency(m,"midi").toFrequency());
         const durSec = Math.max(0.03, Tone.Time(stepToTime(Math.max(1,c.dur|0))).toSeconds() - 0.01);
         try { markSoundActivity(); } catch(e) {}
-        if (!canReserveVoices(__chordVoiceEnds, t, Math.max(1, freqs.length), __CHORD_SOFT_LIMIT)) continue;
         const tt = safeScheduleTime("chord", t);
         polyChord.triggerAttackRelease(freqs, durSec, tt, 0.6);
-        reserveVoices(__chordVoiceEnds, tt + durSec, Math.max(1, freqs.length));
         t = tt + 0.0001;
       }
     }
@@ -787,8 +762,6 @@
 
     __stepCursor = 0;
     for (const k in __lastScheduledByVoice) delete __lastScheduledByVoice[k];
-    __leadVoiceEnds.length = 0;
-    __chordVoiceEnds.length = 0;
     __repeatId = Tone.Transport.scheduleRepeat(__triggerStep, "16n");
     Tone.Transport.start("+0.02");
   }
@@ -800,8 +773,6 @@
       Tone.Transport.clear(__repeatId);
       __repeatId = null;
     }
-    __leadVoiceEnds.length = 0;
-    __chordVoiceEnds.length = 0;
   }
 
 const chordSynth = new Tone.PolySynth(Tone.Synth, {
