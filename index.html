@@ -232,6 +232,11 @@
         <span id="tempoLabel">180</span>
       </label>
 
+      <label class="pill">Master
+        <input id="masterVol" type="range" min="0" max="100" value="85" style="width:140px">
+        <span id="masterVolLabel">85%</span>
+      </label>
+
       <label class="pill">Bars
         <input id="bars" type="range" min="1" max="128" value="16" style="width:160px">
         <span id="barsLabel">16</span>
@@ -422,6 +427,8 @@
 
   const tempo = document.getElementById("tempo");
   const tempoLabel = document.getElementById("tempoLabel");
+  const masterVol = document.getElementById("masterVol");
+  const masterVolLabel = document.getElementById("masterVolLabel");
   const bars = document.getElementById("bars");
   const barsLabel = document.getElementById("barsLabel");
   const snapSelect = document.getElementById("snapSelect");
@@ -503,6 +510,127 @@
     if (userScrollTimer) clearTimeout(userScrollTimer);
     userScrollTimer = setTimeout(()=> userScrollActive = false, 220);
   }
+
+  // ======== Runtime diagnostics (memory/perf) ========
+  const PRC_DEBUG = (() => {
+    let enabled = true;
+    try{
+      const saved = localStorage.getItem("prcDebugMem");
+      if (saved === "0") enabled = false;
+      if (saved === "1") enabled = true;
+    }catch(e){}
+    if (/\bdebugmem=0\b/.test(location.search)) enabled = false;
+    if (/\bdebugmem=1\b/.test(location.search)) enabled = true;
+
+    const state = {
+      uiTickCount: 0,
+      uiThrottleSkips: 0,
+      uiLongFrameCount: 0,
+      uiRafRequestCount: 0,
+      uiRafCancelCount: 0,
+      renderAllCount: 0,
+      gridMelodyCount: 0,
+      gridChordCount: 0,
+      followScrollWrites: 0,
+      pitchLoopCount: 0,
+      pitchLoopEarlyReturn: 0,
+      pitchAutocorrAllocCount: 0,
+      pitchAutocorrAllocBytes: 0,
+      mascotTickCount: 0,
+      mascotRafRequestCount: 0,
+      audioCtxToneHits: 0,
+      audioCtxFallbackNew: 0,
+      transportRepeatScheduled: 0,
+      transportRepeatCleared: 0,
+      transportStopCalls: 0,
+      transportStepCount: 0,
+      noteTrigCount: 0,
+      chordTrigCount: 0,
+      drumTrigCount: 0,
+      lateStepCount: 0,
+      lateStepWorstMs: 0,
+      scheduleClampCount: 0,
+      lateDropCount: 0,
+      drumRebuildCount: 0,
+      swRegisterCount: 0,
+      _lastTs: performance.now(),
+      _lastUiTick: 0,
+      _lastRender: 0,
+      _lastPitch: 0,
+      _lastMascot: 0,
+      _lastTransportStep: 0,
+      _lastTrigTotal: 0
+    };
+
+    function heapMb(){
+      const m = performance && performance.memory ? performance.memory.usedJSHeapSize : null;
+      return m ? (m / (1024 * 1024)) : null;
+    }
+    function log(...args){
+      if (!enabled) return;
+      console.log("%c[PRC-DBG]", "color:#38bdf8", ...args);
+    }
+    function warn(...args){
+      if (!enabled) return;
+      console.warn("[PRC-DBG]", ...args);
+    }
+    function bump(key, n=1){
+      if (!enabled) return 0;
+      state[key] = (state[key] || 0) + n;
+      return state[key];
+    }
+    function summary(){
+      if (!enabled) return;
+      const now = performance.now();
+      const dt = Math.max(0.001, (now - state._lastTs) / 1000);
+      const uiPerSec = ((state.uiTickCount - state._lastUiTick) / dt).toFixed(1);
+      const renderPerSec = ((state.renderAllCount - state._lastRender) / dt).toFixed(1);
+      const pitchPerSec = ((state.pitchLoopCount - state._lastPitch) / dt).toFixed(1);
+      const mascotPerSec = ((state.mascotTickCount - state._lastMascot) / dt).toFixed(1);
+      const stepPerSec = ((state.transportStepCount - state._lastTransportStep) / dt).toFixed(1);
+      const trigTotal = state.noteTrigCount + state.chordTrigCount + state.drumTrigCount;
+      const trigPerSec = ((trigTotal - state._lastTrigTotal) / dt).toFixed(1);
+      const allocKbPerSec = ((state.pitchAutocorrAllocBytes / 1024) / dt).toFixed(1);
+      const heap = heapMb();
+      log(
+        `heap=${heap == null ? "n/a" : heap.toFixed(1) + "MB"}`,
+        `ui=${uiPerSec}/s`,
+        `render=${renderPerSec}/s`,
+        `pitch=${pitchPerSec}/s`,
+        `mascot=${mascotPerSec}/s`,
+        `transportStep=${stepPerSec}/s`,
+        `trig=${trigPerSec}/s`,
+        `late=${state.lateStepCount} worst=${state.lateStepWorstMs.toFixed(1)}ms`,
+        `clamp=${state.scheduleClampCount}`,
+        `drop=${state.lateDropCount}`,
+        `drumRebuild=${state.drumRebuildCount}`,
+        `pitchAlloc=${allocKbPerSec}KB/s`,
+        `audioCtxFallbackNew=${state.audioCtxFallbackNew}`,
+        `audioCtxToneHits=${state.audioCtxToneHits}`,
+        `repeat(schedule/clear)=${state.transportRepeatScheduled}/${state.transportRepeatCleared}`,
+        `stopCalls=${state.transportStopCalls}`,
+        `hidden=${document.hidden ? "1" : "0"}`
+      );
+      state._lastTs = now;
+      state._lastUiTick = state.uiTickCount;
+      state._lastRender = state.renderAllCount;
+      state._lastPitch = state.pitchLoopCount;
+      state._lastMascot = state.mascotTickCount;
+      state._lastTransportStep = state.transportStepCount;
+      state._lastTrigTotal = trigTotal;
+      state.pitchAutocorrAllocBytes = 0;
+      state.lateStepCount = 0;
+      state.lateStepWorstMs = 0;
+      state.lateDropCount = 0;
+    }
+
+    if (enabled){
+      log("runtime diagnostics ON", "set localStorage prcDebugMem=0 to disable");
+      setInterval(summary, 5000);
+    }
+    return { enabled, state, bump, log, warn };
+  })();
+  window.__prcDebug = PRC_DEBUG;
 
   // ======== SCALE ========
   const SCALE_PATTERNS = {
@@ -637,19 +765,92 @@
 
   let __repeatId = null;
   let __stepCursor = 0;
+  const __SCHEDULE_MIN_AHEAD_SEC = 0.02;
+  const __DROP_LATE_MS = 80;
+  const __AUTO_PAUSE_WHEN_HIDDEN = true;
+  const __DRUM_REBUILD_HIT_THRESHOLD = 1536;
+  let __autoPausedByHidden = false;
+  let __resumeStepOnVisible = 0;
+  let __drumHitsSinceRebuild = 0;
+  let __drumRebuildPending = false;
+
+  function __normStepIndex(s){
+    return ((Math.floor(s) % TOTAL_STEPS) + TOTAL_STEPS) % TOTAL_STEPS;
+  }
+
+  function __stepIndexAtTransportTime(time){
+    try{
+      if (Tone && Tone.Transport && typeof Tone.Transport.getTicksAtTime === "function"){
+        const ticks = Tone.Transport.getTicksAtTime(time);
+        const stepTicks = Tone.Transport.PPQ / 4;
+        // Callback times are quantized to 16n; round is more stable than floor at loop boundaries.
+        return __normStepIndex(Math.round(ticks / stepTicks));
+      }
+    }catch(e){}
+    return __normStepIndex(stepFloatFromTransport());
+  }
+
+  function __markDrumHit(){
+    __drumHitsSinceRebuild++;
+    if (__drumHitsSinceRebuild >= __DRUM_REBUILD_HIT_THRESHOLD){
+      __drumHitsSinceRebuild = 0;
+      __drumRebuildPending = true;
+    }
+  }
+
+  function __audioNowImmediate(){
+    try{
+      if (Tone && typeof Tone.immediate === "function"){
+        return Tone.immediate();
+      }
+      if (Tone && Tone.getContext){
+        const tc = Tone.getContext();
+        const rc = tc.rawContext || tc._context || tc.context || tc;
+        if (rc && Number.isFinite(rc.currentTime)) return rc.currentTime;
+      }
+      if (Tone && Tone.context){
+        const rc = Tone.context.rawContext || Tone.context._context || Tone.context.context || Tone.context;
+        if (rc && Number.isFinite(rc.currentTime)) return rc.currentTime;
+      }
+    }catch(e){}
+    return Tone.now();
+  }
 
   function __triggerStep(time){
     // UI (playhead etc.) should stay on RAF thread; just schedule audio here.
+    const nowImmediate = __audioNowImmediate();
+    const stepNow = __stepIndexAtTransportTime(time);
+    __stepCursor = stepNow;
+    try{
+      PRC_DEBUG.bump("transportStepCount");
+      const lagMs = Math.max(0, (nowImmediate - time) * 1000);
+      if (lagMs > 20){
+        PRC_DEBUG.bump("lateStepCount");
+        if (lagMs > PRC_DEBUG.state.lateStepWorstMs){
+          PRC_DEBUG.state.lateStepWorstMs = lagMs;
+        }
+      }
+      // If callback is very late, drop this step and resync cursor to avoid burst playback/backlog.
+      if (lagMs > __DROP_LATE_MS){
+        PRC_DEBUG.bump("lateDropCount");
+        return;
+      }
+    }catch(e){}
     let t = time;
+    if (t < nowImmediate + __SCHEDULE_MIN_AHEAD_SEC){
+      t = nowImmediate + __SCHEDULE_MIN_AHEAD_SEC;
+      try{ PRC_DEBUG.bump("scheduleClampCount"); }catch(e){}
+    }
 
     // Melody notes at this step
     for (let i=0;i<notes.length;i++){
       const n = notes[i];
-      if (n.step !== __stepCursor) continue;
+      if (n.step !== stepNow) continue;
       const durSteps = Math.max(1, n.dur|0);
       const durSec = Math.max(0.02, Tone.Time(stepToTime(durSteps)).toSeconds() - 0.01);
       try { markSoundActivity(); } catch(e) {}
       polyLead.triggerAttackRelease(Tone.Frequency(n.midi,"midi").toFrequency(), durSec, t, n.vel ?? 0.9);
+      try{ PRC_DEBUG.bump("noteTrigCount"); }catch(e){}
       t += 0.0001;
     }
 
@@ -657,35 +858,34 @@
     if (ui.toggles.chords){
       for (let i=0;i<chords.length;i++){
         const c = chords[i];
-        if (c.start !== __stepCursor) continue;
+        if (c.start !== stepNow) continue;
         const baseMidi = clamp(midiMinLimit + 28, midiMinLimit, midiMaxLimit);
         const mids = chordToMidiTriad(c.chord, baseMidi);
         const freqs = mids.map(m=>Tone.Frequency(m,"midi").toFrequency());
         const durSec = Math.max(0.03, Tone.Time(stepToTime(Math.max(1,c.dur|0))).toSeconds() - 0.01);
         try { markSoundActivity(); } catch(e) {}
         polyChord.triggerAttackRelease(freqs, durSec, t, 0.6);
+        try{ PRC_DEBUG.bump("chordTrigCount"); }catch(e){}
         t += 0.0001;
       }
     }
 
     // Drums pattern (same as original)
     if (ui.toggles.drums){
-      const inBar = __stepCursor % STEPS_PER_BAR;
+      const inBar = stepNow % STEPS_PER_BAR;
       try { markSoundActivity(); } catch(e) {}
-      hat.triggerAttackRelease("16n", t, (inBar%2===0)?0.35:0.25); t += 0.0001;
-      if (inBar===0 || inBar===6 || inBar===8 || inBar===14) { kick.triggerAttackRelease("C1","16n",t,0.9); t += 0.0001; }
-      if (inBar===4 || inBar===12) { snare.triggerAttackRelease("16n",t,0.6); t += 0.0001; }
-      if (__stepCursor===0) { crash.triggerAttackRelease("8n",t,0.55); t += 0.0001; }
+      hat.triggerAttackRelease("16n", t, (inBar%2===0)?0.35:0.25); try{ PRC_DEBUG.bump("drumTrigCount"); }catch(e){} __markDrumHit(); t += 0.0001;
+      if (inBar===0 || inBar===6 || inBar===8 || inBar===14) { kick.triggerAttackRelease("C1","16n",t,0.9); try{ PRC_DEBUG.bump("drumTrigCount"); }catch(e){} __markDrumHit(); t += 0.0001; }
+      if (inBar===4 || inBar===12) { snare.triggerAttackRelease("16n",t,0.6); try{ PRC_DEBUG.bump("drumTrigCount"); }catch(e){} __markDrumHit(); t += 0.0001; }
+      if (stepNow===0) { crash.triggerAttackRelease("8n",t,0.55); try{ PRC_DEBUG.bump("drumTrigCount"); }catch(e){} __markDrumHit(); t += 0.0001; }
       const lastBarStart = (TOTAL_BARS-1) * STEPS_PER_BAR;
-      if (__stepCursor>=lastBarStart && inBar>=8 && inBar%2===0){
-        tom.triggerAttackRelease((inBar<12)?"C2":"G2","16n",t,0.55); t += 0.0001;
+      if (stepNow>=lastBarStart && inBar>=8 && inBar%2===0){
+        tom.triggerAttackRelease((inBar<12)?"C2":"G2","16n",t,0.55); try{ PRC_DEBUG.bump("drumTrigCount"); }catch(e){} __markDrumHit(); t += 0.0001;
       }
     }
-
-    __stepCursor = (__stepCursor + 1) % TOTAL_STEPS;
   }
 
-  function startStablePlayback(){
+  function startStablePlayback(startStep=0){
     // Ensure loopEnd consistent
     rebuildAudio();
 
@@ -697,16 +897,40 @@
     Tone.Transport.stop();
     Tone.Transport.cancel(0);
 
-    __stepCursor = 0;
-    __repeatId = Tone.Transport.scheduleRepeat(__triggerStep, "16n");
+    __stepCursor = clamp(__normStepIndex(startStep), 0, TOTAL_STEPS-1);
+    try{
+      Tone.Transport.position = stepToTime(__stepCursor);
+    }catch(e){
+      __stepCursor = 0;
+      Tone.Transport.position = "0:0:0";
+    }
+    // Keep repeat anchored to loop start.
+    // Resume position is controlled by Transport.position, not by shifting repeat phase.
+    const repeatStartTime = "0:0:0";
+    __repeatId = Tone.Transport.scheduleRepeat(__triggerStep, "16n", repeatStartTime);
+    try{
+      PRC_DEBUG.bump("transportRepeatScheduled");
+      PRC_DEBUG.log("scheduleRepeat", {
+        repeatId: __repeatId,
+        bars: TOTAL_BARS,
+        steps: TOTAL_STEPS,
+        startStep: __stepCursor,
+        repeatStartTime
+      });
+    }catch(e){}
     Tone.Transport.start("+0.02");
   }
 
   function stopStablePlayback(){
+    try{ PRC_DEBUG.bump("transportStopCalls"); }catch(e){}
     Tone.Transport.stop();
     Tone.Transport.cancel(0);
     if (__repeatId != null){
       Tone.Transport.clear(__repeatId);
+      try{
+        PRC_DEBUG.bump("transportRepeatCleared");
+        PRC_DEBUG.log("clearRepeat", { repeatId: __repeatId });
+      }catch(e){}
       __repeatId = null;
     }
   }
@@ -716,28 +940,49 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     envelope:{ attack:0.01, decay:0.12, sustain:0.35, release:0.25 }
   });
 
-  const kick = new Tone.MembraneSynth({
-    pitchDecay:0.02, octaves:6,
-    envelope:{attack:0.001, decay:0.22, sustain:0, release:0.06}
-  });
-  const snare = new Tone.NoiseSynth({
-    noise:{type:"white"},
-    envelope:{attack:0.001, decay:0.13, sustain:0}
-  });
-  const hat = new Tone.MetalSynth({
-    frequency: 250,
-    envelope:{attack:0.001, decay:0.06, release:0.01},
-    harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.3
-  });
-  const crash = new Tone.MetalSynth({
-    frequency: 180,
-    envelope:{attack:0.001, decay:0.6, release:0.01},
-    harmonicity: 5.5, modulationIndex: 20, resonance: 6000, octaves: 1.5
-  });
-  const tom = new Tone.MembraneSynth({
-    pitchDecay:0.01, octaves:4,
-    envelope:{attack:0.001, decay:0.16, sustain:0, release:0.05}
-  });
+  let kick = null;
+  let snare = null;
+  let hat = null;
+  let crash = null;
+  let tom = null;
+
+  function buildDrumSynths(){
+    try{ if (kick) kick.dispose(); }catch(e){}
+    try{ if (snare) snare.dispose(); }catch(e){}
+    try{ if (hat) hat.dispose(); }catch(e){}
+    try{ if (crash) crash.dispose(); }catch(e){}
+    try{ if (tom) tom.dispose(); }catch(e){}
+
+    kick = new Tone.MembraneSynth({
+      pitchDecay:0.02, octaves:6,
+      envelope:{attack:0.001, decay:0.22, sustain:0, release:0.06}
+    });
+    snare = new Tone.NoiseSynth({
+      noise:{type:"white"},
+      envelope:{attack:0.001, decay:0.13, sustain:0}
+    });
+    hat = new Tone.MetalSynth({
+      frequency: 250,
+      envelope:{attack:0.001, decay:0.06, release:0.01},
+      harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.3
+    });
+    crash = new Tone.MetalSynth({
+      frequency: 180,
+      envelope:{attack:0.001, decay:0.6, release:0.01},
+      harmonicity: 5.5, modulationIndex: 20, resonance: 6000, octaves: 1.5
+    });
+    tom = new Tone.MembraneSynth({
+      pitchDecay:0.01, octaves:4,
+      envelope:{attack:0.001, decay:0.16, sustain:0, release:0.05}
+    });
+
+    kick.chain(limiter, Tone.Destination);
+    snare.chain(reverb, limiter, Tone.Destination);
+    hat.chain(limiter, Tone.Destination);
+    crash.chain(reverb, limiter, Tone.Destination);
+    tom.chain(reverb, limiter, Tone.Destination);
+  }
+  buildDrumSynths();
 
   chordSynth.chain(reverb, limiter, Tone.Destination);
 
@@ -785,12 +1030,6 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
   buildMonitorSynth();
 
 
-  kick.chain(limiter, Tone.Destination);
-  snare.chain(reverb, limiter, Tone.Destination);
-  hat.chain(limiter, Tone.Destination);
-  crash.chain(reverb, limiter, Tone.Destination);
-  tom.chain(reverb, limiter, Tone.Destination);
-
   Tone.Transport.timeSignature = 4;
   Tone.Transport.bpm.value = Number(tempo.value);
   Tone.Transport.loop = true;
@@ -805,6 +1044,27 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
   const snapSteps = ()=>Number(snapSelect.value);
   const quant = (step)=> Math.round(step / snapSteps()) * snapSteps();
   const setStatus = (msg)=> statusLeft.innerHTML = `Status: <b>${msg}</b>`;
+
+  function masterPctToDb(pct){
+    const p = clamp(Number(pct) || 0, 0, 100);
+    if (p <= 0) return -Infinity;
+    const gain = Math.pow(p / 100, 2);
+    if (Tone && typeof Tone.gainToDb === "function") return Tone.gainToDb(gain);
+    return 20 * Math.log10(gain);
+  }
+  function setMasterVolumePct(pct, announce=false){
+    const p = clamp(Number(pct) || 0, 0, 100);
+    if (masterVol) masterVol.value = String(p);
+    if (masterVolLabel) masterVolLabel.textContent = `${p}%`;
+    const db = masterPctToDb(p);
+    try{
+      if (Tone && Tone.Destination && Tone.Destination.volume){
+        Tone.Destination.volume.rampTo(db, 0.02);
+      }
+    }catch(e){}
+    try{ localStorage.setItem("masterVolumePct", String(p)); }catch(e){}
+    if (announce) setStatus(`Master volume: ${p}%`);
+  }
 
   function stepToX(step){ return step * ui.pxPerStep; }
   function xToStep(x){ return x / ui.pxPerStep; }
@@ -1229,6 +1489,7 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
 
   // ======== RENDER ========
   function drawGrid(ctx, w, h, isMelody){
+    try{ PRC_DEBUG.bump(isMelody ? "gridMelodyCount" : "gridChordCount"); }catch(e){}
     ctx.clearRect(0,0,w,h);
     ctx.fillStyle = "rgba(0,0,0,0.22)";
     ctx.fillRect(0,0,w,h);
@@ -1501,6 +1762,7 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
   }
 
   function renderAll(){
+    try{ PRC_DEBUG.bump("renderAllCount"); }catch(e){}
     renderRuler();
     renderMelody();
     renderChords();
@@ -2178,6 +2440,9 @@ function hitNote(mx,my){
     tempoLabel.textContent = tempo.value;
     Tone.Transport.bpm.value = Number(tempo.value);
   });
+  masterVol.addEventListener("input", ()=>{
+    setMasterVolumePct(masterVol.value, false);
+  });
 
   bars.addEventListener("input", ()=>{
     pushUndo("Bars");
@@ -2455,11 +2720,29 @@ function hitNote(mx,my){
     try{
       if (Tone && Tone.getContext){
         const tc = Tone.getContext();
-        return tc.rawContext || tc._context || tc.context || tc;
+        const raw = tc.rawContext || tc._context || tc.context || tc;
+        if (raw){
+          try{ PRC_DEBUG.bump("audioCtxToneHits"); }catch(e){}
+          return raw;
+        }
       }
-      if (Tone && Tone.context) return Tone.context.rawContext || Tone.context._context || Tone.context;
+      if (Tone && Tone.context){
+        const raw = Tone.context.rawContext || Tone.context._context || Tone.context;
+        if (raw){
+          try{ PRC_DEBUG.bump("audioCtxToneHits"); }catch(e){}
+          return raw;
+        }
+      }
     }catch(e){}
-    return new (window.AudioContext || window.webkitAudioContext)();
+    const Ctx = (window.AudioContext || window.webkitAudioContext);
+    const ctx = new Ctx();
+    try{
+      const n = PRC_DEBUG.bump("audioCtxFallbackNew");
+      if (n <= 5 || n % 30 === 0){
+        PRC_DEBUG.warn("Fallback AudioContext created", { count:n, state:ctx.state, sampleRate:ctx.sampleRate });
+      }
+    }catch(e){}
+    return ctx;
   }
 
   function updatePitchUI(){
@@ -2533,7 +2816,12 @@ function hitNote(mx,my){
     pitchLastTimeMs = null;
     pitchRequiredStableMs = 120;
 
-
+    try{
+      PRC_DEBUG.log("Pitch highlight started", {
+        fftSize: pitchAnalyser.fftSize,
+        tracks: pitchStream ? pitchStream.getAudioTracks().length : 0
+      });
+    }catch(e){}
     requestAnimationFrame(pitchDetectLoop);
     setStatus("Pitch highlight enabled");
   }
@@ -2551,6 +2839,7 @@ function hitNote(mx,my){
     pitchStream = null;
     pitchAnalyser = null;
     pitchBuf = null;
+    try{ PRC_DEBUG.log("Pitch highlight stopped"); }catch(e){}
   }
 
   function freqToMidi(freq){
@@ -2573,6 +2862,10 @@ function hitNote(mx,my){
     if (sliceLen < 128) return -1;
 
     const c = new Float32Array(sliceLen);
+    try{
+      PRC_DEBUG.bump("pitchAutocorrAllocCount");
+      PRC_DEBUG.bump("pitchAutocorrAllocBytes", c.byteLength);
+    }catch(e){}
     for (let i=0;i<sliceLen;i++){
       let sum = 0;
       for (let j=0;j<sliceLen-i;j++){
@@ -2611,7 +2904,11 @@ function hitNote(mx,my){
   }
 
   function pitchDetectLoop(){
-    if (!pitchMode || !pitchAnalyser || !pitchBuf) return;
+    try{ PRC_DEBUG.bump("pitchLoopCount"); }catch(e){}
+    if (!pitchMode || !pitchAnalyser || !pitchBuf){
+      try{ PRC_DEBUG.bump("pitchLoopEarlyReturn"); }catch(e){}
+      return;
+    }
 
     pitchAnalyser.getFloatTimeDomainData(pitchBuf);
     const ctx = getSharedAudioContext();
@@ -2659,28 +2956,76 @@ function hitNote(mx,my){
 
   btnPlay.addEventListener("click", async ()=>{
     if (isPlaying) return;
+    __autoPausedByHidden = false;
     await Tone.start();
-    if (rafId) cancelAnimationFrame(rafId);
+    if (rafId){
+      try{ PRC_DEBUG.warn("btnPlay: cancel stale ui RAF before start", { rafId }); }catch(e){}
+      cancelAnimationFrame(rafId);
+      try{ PRC_DEBUG.bump("uiRafCancelCount"); }catch(e){}
+    }
     rafId = null;
     startStablePlayback();
     isPlaying = true;
     posMelody.classList.add("playing");
     posChords.classList.add("playing");
     rafId = requestAnimationFrame(tickUI);
+    try{ PRC_DEBUG.bump("uiRafRequestCount"); }catch(e){}
     setStatus("Playing");
   });
 
   btnStop.addEventListener("click", ()=>{
+    __autoPausedByHidden = false;
     stopStablePlayback();
     Tone.Transport.position = "0:0:0";
     isPlaying = false;
     playStepFloat = 0;
     posMelody.classList.remove("playing");
     posChords.classList.remove("playing");
-    if (rafId) cancelAnimationFrame(rafId);
+    if (rafId){
+      cancelAnimationFrame(rafId);
+      try{ PRC_DEBUG.bump("uiRafCancelCount"); }catch(e){}
+    }
     rafId = null;
     renderAll();
     setStatus("Stopped");
+  });
+
+  document.addEventListener("visibilitychange", ()=>{
+    if (!__AUTO_PAUSE_WHEN_HIDDEN) return;
+
+    if (document.hidden){
+      if (!isPlaying) return;
+      __resumeStepOnVisible = __normStepIndex(stepFloatFromTransport());
+      __autoPausedByHidden = true;
+      stopStablePlayback();
+      isPlaying = false;
+      if (rafId){
+        cancelAnimationFrame(rafId);
+        try{ PRC_DEBUG.bump("uiRafCancelCount"); }catch(e){}
+      }
+      rafId = null;
+      playStepFloat = __resumeStepOnVisible;
+      posMelody.classList.remove("playing");
+      posChords.classList.remove("playing");
+      try{ PRC_DEBUG.log("autoPause(hidden)", { resumeStep: __resumeStepOnVisible }); }catch(e){}
+      return;
+    }
+
+    if (!__autoPausedByHidden) return;
+    __autoPausedByHidden = false;
+    startStablePlayback(__resumeStepOnVisible);
+    isPlaying = true;
+    posMelody.classList.add("playing");
+    posChords.classList.add("playing");
+    if (rafId){
+      cancelAnimationFrame(rafId);
+      try{ PRC_DEBUG.bump("uiRafCancelCount"); }catch(e){}
+    }
+    rafId = requestAnimationFrame(tickUI);
+    try{
+      PRC_DEBUG.bump("uiRafRequestCount");
+      PRC_DEBUG.log("autoResume(visible)", { resumeStep: __resumeStepOnVisible });
+    }catch(e){}
   });
 
   // Spacebar: toggle Play/Stop (ignore when typing in inputs)
@@ -2762,6 +3107,7 @@ renderAll();
   function followScrollToX(x){
     if (!ui.follow) return;
     const target = clamp(x - melodyScroll.clientWidth*0.35, 0, melodyCanvas.width);
+    try{ PRC_DEBUG.bump("followScrollWrites"); }catch(e){}
     syncingScroll = true;
     try{
       melodyScroll.scrollLeft = target;
@@ -2775,8 +3121,27 @@ renderAll();
 
   function tickUI(ts){
     const nowTs = ts ?? performance.now();
+    if (__drumRebuildPending){
+      __drumRebuildPending = false;
+      try{
+        buildDrumSynths();
+        PRC_DEBUG.bump("drumRebuildCount");
+        PRC_DEBUG.log("drum synths rebuilt");
+      }catch(e){
+        try{ PRC_DEBUG.warn("drum synth rebuild failed", e && e.message ? e.message : e); }catch(_){}
+      }
+    }
+    try{ PRC_DEBUG.bump("uiTickCount"); }catch(e){}
+    if (lastUiTs){
+      const frameDt = nowTs - lastUiTs;
+      if (frameDt > 120){
+        try{ PRC_DEBUG.bump("uiLongFrameCount"); }catch(e){}
+      }
+    }
     if (nowTs - lastUiTs < 33){
+      try{ PRC_DEBUG.bump("uiThrottleSkips"); }catch(e){}
       if (isPlaying) rafId = requestAnimationFrame(tickUI);
+      try{ if (isPlaying) PRC_DEBUG.bump("uiRafRequestCount"); }catch(e){}
       return;
     }
     lastUiTs = nowTs;
@@ -2792,6 +3157,7 @@ renderAll();
 
     renderAll();
     if (isPlaying) rafId = requestAnimationFrame(tickUI);
+    try{ if (isPlaying) PRC_DEBUG.bump("uiRafRequestCount"); }catch(e){}
   }
 
   // ======== AUDIO BUILD ========
@@ -2837,7 +3203,8 @@ renderAll();
         snap: { grid: snapSteps() },
         toggles: deepClone(ui.toggles),
         follow: ui.follow,
-        autoRetune: ui.autoRetune
+        autoRetune: ui.autoRetune,
+        masterVolumePct: Number(masterVol.value || 85)
       }
     };
   }
@@ -2877,6 +3244,9 @@ renderAll();
     }
     if (typeof data.ui?.follow === "boolean") ui.follow = data.ui.follow;
     if (typeof data.ui?.autoRetune === "boolean") ui.autoRetune = data.ui.autoRetune;
+    if (typeof data.ui?.masterVolumePct === "number"){
+      setMasterVolumePct(data.ui.masterVolumePct, false);
+    }
 
     btnToggleDrums.textContent = `🥁 Drums: ${ui.toggles.drums ? "ON":"OFF"}`;
     btnToggleChords.textContent = `🎸 Chords: ${ui.toggles.chords ? "ON":"OFF"}`;
@@ -2957,6 +3327,9 @@ renderAll();
     tempoLabel.textContent = tempo.value;
     barsLabel.textContent = bars.value;
     zoomLabel.textContent = zoom.value;
+    const storedMaster = Number(localStorage.getItem("masterVolumePct"));
+    const initialMaster = Number.isFinite(storedMaster) ? storedMaster : Number(masterVol.value || 85);
+    setMasterVolumePct(initialMaster, false);
 
     ui.pxPerStep = Number(zoom.value);
 
@@ -3162,6 +3535,10 @@ function isTransportPlaying() {
   }
 
   function tick(now) {
+    try{
+      const dbg = window.__prcDebug;
+      if (dbg && dbg.enabled) dbg.bump('mascotTickCount');
+    }catch(e){}
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
 
@@ -3199,9 +3576,17 @@ function isTransportPlaying() {
     }
 
     requestAnimationFrame(tick);
+    try{
+      const dbg = window.__prcDebug;
+      if (dbg && dbg.enabled) dbg.bump('mascotRafRequestCount');
+    }catch(e){}
   }
 
   requestAnimationFrame(tick);
+  try{
+    const dbg = window.__prcDebug;
+    if (dbg && dbg.enabled) dbg.bump('mascotRafRequestCount');
+  }catch(e){}
 })();
 </script>
 
@@ -3209,6 +3594,23 @@ function isTransportPlaying() {
 </html>
 <script>
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js");
+  navigator.serviceWorker.register("sw.js")
+    .then((reg)=>{
+      try{
+        if (window.__prcDebug && window.__prcDebug.enabled){
+          window.__prcDebug.bump("swRegisterCount");
+          window.__prcDebug.log("serviceWorker.register", {
+            scope: reg && reg.scope ? reg.scope : "(unknown)"
+          });
+        }
+      }catch(e){}
+    })
+    .catch((err)=>{
+      try{
+        if (window.__prcDebug && window.__prcDebug.enabled){
+          window.__prcDebug.warn("serviceWorker.register failed", err && err.message ? err.message : err);
+        }
+      }catch(e){}
+    });
 }
 </script>
