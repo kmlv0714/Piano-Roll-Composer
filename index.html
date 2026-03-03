@@ -37,7 +37,23 @@
       box-shadow: var(--shadow);
       overflow:hidden;
     }
-    .toolbar{flex:1 1 760px;padding:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+    .toolbar{flex:1 1 760px;padding:12px;display:flex;gap:10px;flex-direction:column;align-items:stretch;}
+    .transportFixed{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+    .tabBar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+    .tabPanels{
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:10px;
+      background:rgba(0,0,0,.14);
+    }
+    .tabPanel{display:none;gap:10px;flex-wrap:wrap;align-items:center;}
+    .tabPanel.active{display:flex;}
+    .tabBtn{opacity:.82;}
+    .tabBtn.active{
+      opacity:1;
+      border-color:#39507a;
+      box-shadow: 0 0 0 3px rgba(56,189,248,.16) inset;
+    }
     .right{flex:1 1 380px;padding:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;}
     .pill{
       display:inline-flex;align-items:center;gap:8px;
@@ -198,136 +214,153 @@
 
   <div class="top">
     <div class="card toolbar">
-      <button id="btnStartAudio" class="btn primary">🔊 Audio Unlock</button>
-      <button id="btnMidi" class="btn">🎛 MIDI: OFF</button>
-      <button id="btnPitch" class="btn">🎤 Pitch: OFF</button>
-      <label id="pitchThreshWrap" class="pill" style="display:none;">Thresh
-        <input id="pitchThresh" type="range" min="0" max="0.30" step="0.005" value="0.06" style="width:140px">
-        <span id="pitchThreshLabel">0.06</span>
-      </label>
+      <div class="transportFixed">
+        <button id="btnStartAudio" class="btn primary">Audio Unlock</button>
+        <button id="btnPlay" class="btn good">Play</button>
+        <button id="btnStop" class="btn">Stop</button>
+        <label class="pill">Tempo
+          <input id="tempo" type="range" min="60" max="240" value="180" style="width:160px">
+          <span id="tempoLabel">180</span>
+        </label>
+        <label class="pill">Master
+          <input id="masterVol" type="range" min="0" max="100" value="85" style="width:140px">
+          <span id="masterVolLabel">85%</span>
+        </label>
+      </div>
 
-      <label class="pill">Melody
-        <select id="melodyTimbre">
-          <option value="saw">Saw Lead</option>
-          <option value="square">Square Lead</option>
-          <option value="triangle">Triangle Soft</option>
-          <option value="sine">Sine Pure</option>
-          <option value="fm">FM Bell</option>
-          <option value="am">AM Soft</option>
-          <option value="mono">Mono Bass/Lead</option>
-        </select>
-      </label>
+      <div class="tabBar">
+        <button type="button" class="btn tabBtn active" data-tab="input">Input</button>
+        <button type="button" class="btn tabBtn" data-tab="sound">Sound</button>
+        <button type="button" class="btn tabBtn" data-tab="scale">Scale</button>
+        <button type="button" class="btn tabBtn" data-tab="random">Random</button>
+        <button type="button" class="btn tabBtn" data-tab="edit">Edit/View</button>
+      </div>
 
-      <label class="pill">MIDI In
-        <select id="midiInputSelect"><option value="">(none)</option></select>
-      </label>
-      <button id="btnPlay" class="btn good">▶ Play</button>
-      <button id="btnStop" class="btn">⏹ Stop</button>
-      <button id="btnStepInput" class="btn">⌨️ Step Input: OFF</button>
+      <div class="tabPanels">
+        <div class="tabPanel active" data-tab-panel="input">
+          <button id="btnMidi" class="btn">MIDI: OFF</button>
+          <label class="pill">MIDI In
+            <select id="midiInputSelect"><option value="">(none)</option></select>
+          </label>
+          <button id="btnPitch" class="btn">Pitch: OFF</button>
+          <label id="pitchThreshWrap" class="pill" style="display:none;">Thresh
+            <input id="pitchThresh" type="range" min="0" max="0.30" step="0.005" value="0.06" style="width:140px">
+            <span id="pitchThreshLabel">0.06</span>
+          </label>
+          <button id="btnStepInput" class="btn">Step Input: OFF</button>
+        </div>
 
-      <div class="sep"></div>
+        <div class="tabPanel" data-tab-panel="sound">
+          <label class="pill">Melody
+            <select id="melodyTimbre">
+              <option value="saw">Saw Lead</option>
+              <option value="square">Square Lead</option>
+              <option value="triangle">Triangle Soft</option>
+              <option value="sine">Sine Pure</option>
+              <option value="fm">FM Bell</option>
+              <option value="am">AM Soft</option>
+              <option value="mono">Mono Bass/Lead</option>
+            </select>
+          </label>
+          <button id="btnToggleDrums" class="btn">Drums: ON</button>
+          <button id="btnToggleChords" class="btn">Chords: ON</button>
+        </div>
 
-      <label class="pill">Tempo
-        <input id="tempo" type="range" min="60" max="240" value="180" style="width:160px">
-        <span id="tempoLabel">180</span>
-      </label>
+        <div class="tabPanel" data-tab-panel="scale">
+          <label class="pill">Scale
+            <select id="scaleRoot">
+              <option>C</option><option>C#</option><option>D</option><option>D#</option><option>E</option><option>F</option>
+              <option>F#</option><option>G</option><option>G#</option><option>A</option><option>A#</option><option>B</option>
+            </select>
+            <select id="scaleType">
+              <option value="major">Major</option>
+              <option value="natural_minor">Natural Minor</option>
+              <option value="harmonic_minor">Harmonic Minor</option>
+              <option value="phrygian_dominant" selected>Phrygian Dominant (Arabian)</option>
+              <option value="dorian">Dorian</option>
+              <option value="mixolydian">Mixolydian</option>
+            </select>
+          </label>
+          <button id="btnRetune" class="btn">Retune to Scale</button>
+          <button id="btnAutoRetune" class="btn">AutoRetune: ON</button>
+          <button id="btnToggleAssist" class="btn">Assist: ON</button>
+          <button id="btnToggleChordTones" class="btn">Chord Tones: ON</button>
+        </div>
 
-      <label class="pill">Master
-        <input id="masterVol" type="range" min="0" max="100" value="85" style="width:140px">
-        <span id="masterVolLabel">85%</span>
-      </label>
+        <div class="tabPanel" data-tab-panel="random">
+          <button id="btnRandomizeSelectedPitch" class="btn">Randomize Sel Pitch</button>
+          <label class="pill">Rand Pos
+            <select id="randPosMode">
+              <option value="selection" selected>Selection</option>
+              <option value="cursor">Cursor + Bars</option>
+              <option value="song">Whole Song</option>
+            </select>
+          </label>
+          <label class="pill">Rand Bars
+            <input id="randBarsSpan" type="range" min="1" max="16" value="4" style="width:110px">
+            <span id="randBarsSpanLabel">4</span>
+          </label>
+          <label class="pill">Density
+            <input id="randDensity" type="range" min="2" max="16" value="8" style="width:110px">
+            <span id="randDensityLabel">8</span>
+          </label>
+          <label class="pill">Intvl Near
+            <input id="randIntNear" type="range" min="0" max="10" value="6" style="width:90px">
+            <span id="randIntNearLabel">6</span>
+          </label>
+          <label class="pill">Intvl Mid
+            <input id="randIntMid" type="range" min="0" max="10" value="3" style="width:90px">
+            <span id="randIntMidLabel">3</span>
+          </label>
+          <label class="pill">Intvl Far
+            <input id="randIntFar" type="range" min="0" max="10" value="1" style="width:90px">
+            <span id="randIntFarLabel">1</span>
+          </label>
+          <button id="btnRandomizeStructure" class="btn">Randomize Notes</button>
+        </div>
 
-      <label class="pill">Bars
-        <input id="bars" type="range" min="1" max="128" value="16" style="width:160px">
-        <span id="barsLabel">16</span>
-      </label>
-
-      <label class="pill">Snap
-        <select id="snapSelect">
-          <option value="0.5">1/32</option>
-          <option value="1">1/16</option>
-          <option value="2">1/8</option>
-          <option value="4" selected>1/4</option>
-          <option value="8">1/2</option>
-          <option value="16">1 bar</option>
-        </select>
-      </label>
-
-      <label class="pill">Zoom (px/16th)
-        <input id="zoom" type="range" min="10" max="40" value="18" style="width:160px">
-        <span id="zoomLabel">18</span>
-      </label>
-
-      <div class="sep"></div>
-
-      <label class="pill">Scale
-        <select id="scaleRoot">
-          <option>C</option><option>C#</option><option>D</option><option>D#</option><option>E</option><option>F</option>
-          <option>F#</option><option>G</option><option>G#</option><option>A</option><option>A#</option><option>B</option>
-        </select>
-        <select id="scaleType">
-          <option value="major">Major</option>
-          <option value="natural_minor">Natural Minor</option>
-          <option value="harmonic_minor">Harmonic Minor</option>
-          <option value="phrygian_dominant" selected>Phrygian Dominant (Arabian)</option>
-          <option value="dorian">Dorian</option>
-          <option value="mixolydian">Mixolydian</option>
-        </select>
-      </label>
-
-      <button id="btnRetune" class="btn">🧲 Retune to Scale</button>
-      <button id="btnRandomizeSelectedPitch" class="btn">🎲 Randomize Sel Pitch</button>
-      <label class="pill">Rand Pos
-        <select id="randPosMode">
-          <option value="selection" selected>Selection</option>
-          <option value="cursor">Cursor + Bars</option>
-          <option value="song">Whole Song</option>
-        </select>
-      </label>
-      <label class="pill">Rand Bars
-        <input id="randBarsSpan" type="range" min="1" max="16" value="4" style="width:110px">
-        <span id="randBarsSpanLabel">4</span>
-      </label>
-      <label class="pill">Density
-        <input id="randDensity" type="range" min="2" max="16" value="8" style="width:110px">
-        <span id="randDensityLabel">8</span>
-      </label>
-      <button id="btnRandomizeStructure" class="btn">🎲 Randomize Notes</button>
-      <button id="btnAutoRetune" class="btn">🪄 AutoRetune: ON</button>
-
-      <div class="sep"></div>
-
-      <label class="pill">Pitch Range
-        <span class="small">C</span>
-        <select id="pitchLowOct"></select>
-        <span class="small">〜 C</span>
-        <select id="pitchHighOct"></select>
-      </label>
-
-      <div class="sep"></div>
-
-      <button id="btnUndo" class="btn">↩ Undo</button>
-      <button id="btnRedo" class="btn">↪ Redo</button>
-      <button id="btnCopy" class="btn">📋 Copy</button>
-      <button id="btnPaste" class="btn">📌 Paste</button>
-
-      <div class="sep"></div>
-
-      <button id="btnToggleDrums" class="btn">🥁 Drums: ON</button>
-      <button id="btnToggleChords" class="btn">🎸 Chords: ON</button>
-      <button id="btnToggleAssist" class="btn">🧠 Assist: ON</button>
-      <button id="btnToggleChordTones" class="btn">🎹 Chord Tones: ON</button>
-      <button id="btnToggleFollow" class="btn">🎯 Follow: ON</button>
+        <div class="tabPanel" data-tab-panel="edit">
+          <label class="pill">Bars
+            <input id="bars" type="range" min="1" max="128" value="16" style="width:160px">
+            <span id="barsLabel">16</span>
+          </label>
+          <label class="pill">Snap
+            <select id="snapSelect">
+              <option value="0.5">1/32</option>
+              <option value="1">1/16</option>
+              <option value="2">1/8</option>
+              <option value="4" selected>1/4</option>
+              <option value="8">1/2</option>
+              <option value="16">1 bar</option>
+            </select>
+          </label>
+          <label class="pill">Zoom (px/16th)
+            <input id="zoom" type="range" min="10" max="40" value="18" style="width:160px">
+            <span id="zoomLabel">18</span>
+          </label>
+          <label class="pill">Pitch Range
+            <span class="small">C</span>
+            <select id="pitchLowOct"></select>
+            <span class="small">~ C</span>
+            <select id="pitchHighOct"></select>
+          </label>
+          <button id="btnUndo" class="btn">Undo</button>
+          <button id="btnRedo" class="btn">Redo</button>
+          <button id="btnCopy" class="btn">Copy</button>
+          <button id="btnPaste" class="btn">Paste</button>
+          <button id="btnToggleFollow" class="btn">Follow: ON</button>
+        </div>
+      </div>
     </div>
 
     <div class="card right">
-      <button id="btnSave" class="btn">💾 Save JSON</button>
+            <button id="btnSave" class="btn">Save JSON</button>
       <label class="btn" style="gap:10px;cursor:pointer;">
-        📂 Load JSON
+        Load JSON
         <input id="fileLoad" type="file" accept="application/json" style="display:none">
       </label>
       <div class="pill small" style="flex:1;justify-content:center;">
-        🧭 音階側も <b style="color:var(--text)">Wheel</b> で縦スクロールOK
+        Mouse wheel scroll works over the piano roll.
       </div>
     </div>
   </div>
@@ -367,22 +400,21 @@
 </div>
 </div>
 
-    
   <div class="card ops">
     <div class="panelHeader">
-      <div class="title">操作まとめ <span class="badge">Tips</span></div>
+      <div class="title">Operations <span class="badge">Tips</span></div>
     </div>
     <div class="opsBody">
-      <div class="opline"><b>横スクロール:</b> ロール空白を<span class="k">Drag</span>でスクロール（スクロールバー非表示のまま） / 上の小節Rulerも<span class="k">Drag</span>でスクロール</div>
-      <div class="opline"><b>再生追従:</b> <span class="k">Space</span>で再生/停止。再生中は再生バーに合わせて自動スクロール</div>
-      <div class="opline"><b>ノート:</b> 空白<span class="k">Click</span>で追加（stepCursorも移動） / ノート<span class="k">Drag</span>で移動 / 端<span class="k">Drag</span>で長さ / ノート上<span class="k">Wheel</span>で音程 / <span class="k">Right Click</span>削除</div>
-      <div class="opline"><b>コード:</b> ブロック<span class="k">Drag</span>で移動 / 端<span class="k">Drag</span>で長さ / <span class="k">Wheel</span>でコード変更 / <span class="k">Right Click</span>削除 / <span class="k">Click</span>で試聴（再生と同じ音源）</div>
+      <div class="opline"><b>Horizontal Scroll:</b> Drag empty area in the roll, or drag on the ruler.</div>
+      <div class="opline"><b>Playback:</b> Press <span class="k">Space</span> to Play/Stop. During playback, Follow mode auto-scrolls.</div>
+      <div class="opline"><b>Notes:</b> <span class="k">Click</span> to place at step cursor, <span class="k">Drag</span> to move/resize, <span class="k">Wheel</span> for velocity, <span class="k">Right Click</span> to delete.</div>
+      <div class="opline"><b>Chords:</b> <span class="k">Drag</span> to move/resize, <span class="k">Wheel</span> to switch chord, <span class="k">Right Click</span> to delete, <span class="k">Click</span> to open chord picker.</div>
     </div>
   </div>
 
 <div class="card status">
     <div id="statusLeft">Status: <b>Ready</b></div>
-    <div class="small">スクロール同期/追従の“固定される問題”を回避（ユーザー操作中はFollow抑制）</div>
+    <div class="small">Scroll/edit while stopped, and use Follow during playback for smoother tracking.</div>
   </div>
 </div>
 
@@ -463,8 +495,28 @@
   const randBarsSpanLabel = document.getElementById("randBarsSpanLabel");
   const randDensity = document.getElementById("randDensity");
   const randDensityLabel = document.getElementById("randDensityLabel");
+  const randIntNear = document.getElementById("randIntNear");
+  const randIntNearLabel = document.getElementById("randIntNearLabel");
+  const randIntMid = document.getElementById("randIntMid");
+  const randIntMidLabel = document.getElementById("randIntMidLabel");
+  const randIntFar = document.getElementById("randIntFar");
+  const randIntFarLabel = document.getElementById("randIntFarLabel");
   const btnRandomizeStructure = document.getElementById("btnRandomizeStructure");
   const btnAutoRetune = document.getElementById("btnAutoRetune");
+
+  const tabButtons = Array.from(document.querySelectorAll(".tabBtn"));
+  const tabPanels = Array.from(document.querySelectorAll(".tabPanel"));
+
+  function setTopTab(tabName){
+    for (const btn of tabButtons){
+      const active = btn.dataset.tab === tabName;
+      btn.classList.toggle("active", active);
+    }
+    for (const panel of tabPanels){
+      const active = panel.dataset.tabPanel === tabName;
+      panel.classList.toggle("active", active);
+    }
+  }
 
   let TOTAL_BARS = 16;
   let TOTAL_STEPS = TOTAL_BARS * STEPS_PER_BAR;
@@ -1196,7 +1248,7 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     const ints = new Set(parsed.tones.map(t => (t - root + 12) % 12));
     const has3 = ints.has(3), has4 = ints.has(4);
     const has6 = ints.has(6), has7 = ints.has(7), has8 = ints.has(8);
-    if (has3 && has6) return {case:"lower", suffix:"°"};     // diminished
+    if (has3 && has6) return {case:"lower", suffix:"dim"};     // diminished
     if (has4 && has8) return {case:"upper", suffix:"+"};     // augmented
     if (has3 && has7) return {case:"lower", suffix:""};      // minor
     if (has4 && has7) return {case:"upper", suffix:""};      // major
@@ -1225,7 +1277,7 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
         if (ad < best.abs){
           best.abs = ad;
           best.deg = i+1;
-          best.acc = diff === -1 ? "♭" : (diff === 1 ? "♯" : "");
+          best.acc = diff === -1 ? "b" : (diff === 1 ? "#" : "");
         }
       }
       if (best.abs <= 1 && best.acc){
@@ -1353,11 +1405,7 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
   }
 
   function randomMidiFromAllowed(allowedPCs, currentMidi){
-    const cands = [];
-    for (let m = midiMinLimit; m <= midiMaxLimit; m++){
-      const pc = ((m % 12) + 12) % 12;
-      if (allowedPCs.has(pc)) cands.push(m);
-    }
+    const cands = candidateMidisFromAllowed(allowedPCs);
     const cur = Number.isFinite(currentMidi) ? currentMidi : null;
     if (!cands.length) return cur == null ? clamp(60, midiMinLimit, midiMaxLimit) : cur;
     if (cands.length === 1) return cands[0];
@@ -1375,6 +1423,64 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
       }
     }
     return clamp(pick, midiMinLimit, midiMaxLimit);
+  }
+
+  function candidateMidisFromAllowed(allowedPCs){
+    const cands = [];
+    for (let m = midiMinLimit; m <= midiMaxLimit; m++){
+      const pc = ((m % 12) + 12) % 12;
+      if (allowedPCs.has(pc)) cands.push(m);
+    }
+    return cands;
+  }
+
+  function getIntervalWeights(){
+    return {
+      near: clamp(Number(randIntNear?.value || 0), 0, 10),
+      mid: clamp(Number(randIntMid?.value || 0), 0, 10),
+      far: clamp(Number(randIntFar?.value || 0), 0, 10)
+    };
+  }
+
+  function weightedMidiFromAllowed(allowedPCs, prevMidi){
+    const cands = candidateMidisFromAllowed(allowedPCs);
+    if (!cands.length) return clamp(60, midiMinLimit, midiMaxLimit);
+    if (!Number.isFinite(prevMidi)) return cands[Math.floor(Math.random() * cands.length)];
+
+    const near = [];
+    const mid = [];
+    const far = [];
+    for (const m of cands){
+      const d = Math.abs(m - prevMidi);
+      if (d <= 2) near.push(m);
+      else if (d <= 7) mid.push(m);
+      else far.push(m);
+    }
+
+    const w = getIntervalWeights();
+    const buckets = [];
+    if (near.length && w.near > 0) buckets.push({arr:near, w:w.near});
+    if (mid.length && w.mid > 0) buckets.push({arr:mid, w:w.mid});
+    if (far.length && w.far > 0) buckets.push({arr:far, w:w.far});
+
+    if (!buckets.length){
+      if (near.length) buckets.push({arr:near, w:1});
+      if (mid.length) buckets.push({arr:mid, w:1});
+      if (far.length) buckets.push({arr:far, w:1});
+    }
+
+    let total = 0;
+    for (const b of buckets) total += b.w;
+    let r = Math.random() * total;
+    let chosen = buckets[0].arr;
+    for (const b of buckets){
+      r -= b.w;
+      if (r <= 0){
+        chosen = b.arr;
+        break;
+      }
+    }
+    return chosen[Math.floor(Math.random() * chosen.length)];
   }
 
   function randomizeSelectedNotesPitch(){
@@ -1475,6 +1581,12 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
 
     const scalePCs = getSelectedScalePCs();
     const created = [];
+    let prevMidi = null;
+    const prev = notes
+      .filter(n => n.step < cfg.start)
+      .sort((a,b)=> (a.step - b.step) || (a.midi - b.midi));
+    if (prev.length) prevMidi = prev[prev.length-1].midi;
+
     const maxAttempts = Math.max(count * 20, slots * 12);
     let attempts = 0;
     while (created.length < count && attempts < maxAttempts){
@@ -1483,11 +1595,16 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
       const step = clamp(cfg.start + slot * snap, cfg.start, cfg.end - snap);
       const dur = clamp(randomDuration(step, cfg.end, snap), snap, cfg.end - step);
       if (overlapsAnyNote(step, dur, notes)) continue;
-      const allowed = allowedPitchClassesAtStep(step, scalePCs);
-      const midi = randomMidiFromAllowed(allowed, null);
-      const n = { step, dur, midi, vel: 1.0 };
+      const n = { step, dur, midi: clamp(60, midiMinLimit, midiMaxLimit), vel: 1.0 };
       notes.push(n);
       created.push(n);
+    }
+
+    created.sort((a,b)=> (a.step - b.step) || (a.dur - b.dur));
+    for (const n of created){
+      const allowed = allowedPitchClassesAtStep(n.step, scalePCs);
+      n.midi = weightedMidiFromAllowed(allowed, prevMidi);
+      prevMidi = n.midi;
     }
 
     notes.sort((a,b)=> (a.step - b.step) || (a.midi - b.midi));
@@ -1546,13 +1663,12 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
 
     zoom.value = String(ui.pxPerStep);
     zoomLabel.textContent = String(ui.pxPerStep);
-
-    btnToggleDrums.textContent = `🥁 Drums: ${ui.toggles.drums ? "ON":"OFF"}`;
-    btnToggleChords.textContent = `🎸 Chords: ${ui.toggles.chords ? "ON":"OFF"}`;
-    btnToggleAssist.textContent = `🧠 Assist: ${ui.toggles.assist ? "ON":"OFF"}`;
-    btnToggleChordTones.textContent = `🎹 Chord Tones: ${ui.toggles.chordTones ? "ON":"OFF"}`;
-    btnToggleFollow.textContent = `🎯 Follow: ${ui.follow ? "ON":"OFF"}`;
-    btnAutoRetune.textContent = `🪄 AutoRetune: ${ui.autoRetune ? "ON":"OFF"}`;
+    btnToggleDrums.textContent = `Drums: ${ui.toggles.drums ? "ON":"OFF"}`;
+    btnToggleChords.textContent = `Chords: ${ui.toggles.chords ? "ON":"OFF"}`;
+    btnToggleAssist.textContent = `Assist: ${ui.toggles.assist ? "ON":"OFF"}`;
+    btnToggleChordTones.textContent = `Chord Tones: ${ui.toggles.chordTones ? "ON":"OFF"}`;
+    btnToggleFollow.textContent = `Follow: ${ui.follow ? "ON":"OFF"}`;
+    btnAutoRetune.textContent = `AutoRetune: ${ui.autoRetune ? "ON":"OFF"}`;
 
     syncPitchRangeDropdowns();
     resizeCanvases();
@@ -2593,38 +2709,45 @@ function hitNote(mx,my){
   // ======== UI TOGGLES ========
   btnToggleDrums.addEventListener("click", ()=>{
     ui.toggles.drums = !ui.toggles.drums;
-    btnToggleDrums.textContent = `🥁 Drums: ${ui.toggles.drums ? "ON" : "OFF"}`;
+    btnToggleDrums.textContent = `Drums: ${ui.toggles.drums ? "ON":"OFF"}`;
     rebuildAudio(); setStatus("Drums toggled");
   });
   btnToggleChords.addEventListener("click", ()=>{
     ui.toggles.chords = !ui.toggles.chords;
-    btnToggleChords.textContent = `🎸 Chords: ${ui.toggles.chords ? "ON" : "OFF"}`;
+    btnToggleChords.textContent = `Chords: ${ui.toggles.chords ? "ON":"OFF"}`;
     rebuildAudio(); setStatus("Chords toggled");
   });
   btnToggleAssist.addEventListener("click", ()=>{
     ui.toggles.assist = !ui.toggles.assist;
-    btnToggleAssist.textContent = `🧠 Assist: ${ui.toggles.assist ? "ON" : "OFF"}`;
+    btnToggleAssist.textContent = `Assist: ${ui.toggles.assist ? "ON":"OFF"}`;
     renderAll(); setStatus("Assist toggled");
   });
   btnToggleChordTones.addEventListener("click", ()=>{
     ui.toggles.chordTones = !ui.toggles.chordTones;
-    btnToggleChordTones.textContent = `🎹 Chord Tones: ${ui.toggles.chordTones ? "ON" : "OFF"}`;
+    btnToggleChordTones.textContent = `Chord Tones: ${ui.toggles.chordTones ? "ON":"OFF"}`;
     renderAll(); setStatus("Chord overlay toggled");
   });
   btnToggleFollow.addEventListener("click", ()=>{
     ui.follow = !ui.follow;
-    btnToggleFollow.textContent = `🎯 Follow: ${ui.follow ? "ON":"OFF"}`;
+    btnToggleFollow.textContent = `Follow: ${ui.follow ? "ON":"OFF"}`;
     setStatus("Follow toggled");
   });
 
   btnAutoRetune.addEventListener("click", ()=>{
     ui.autoRetune = !ui.autoRetune;
-    btnAutoRetune.textContent = `🪄 AutoRetune: ${ui.autoRetune ? "ON":"OFF"}`;
+    btnAutoRetune.textContent = `AutoRetune: ${ui.autoRetune ? "ON":"OFF"}`;
     setStatus("AutoRetune toggled");
   });
   btnRetune.addEventListener("click", retuneAllNotesToScale);
   btnRandomizeSelectedPitch.addEventListener("click", randomizeSelectedNotesPitch);
   btnRandomizeStructure.addEventListener("click", randomizeNotesStructure);
+
+  for (const btn of tabButtons){
+    btn.addEventListener("click", ()=>{
+      const target = btn.dataset.tab;
+      if (target) setTopTab(target);
+    });
+  }
 
   tempo.addEventListener("input", ()=>{
     tempoLabel.textContent = tempo.value;
@@ -2635,6 +2758,15 @@ function hitNote(mx,my){
   });
   randDensity.addEventListener("input", ()=>{
     randDensityLabel.textContent = randDensity.value;
+  });
+  randIntNear.addEventListener("input", ()=>{
+    randIntNearLabel.textContent = randIntNear.value;
+  });
+  randIntMid.addEventListener("input", ()=>{
+    randIntMidLabel.textContent = randIntMid.value;
+  });
+  randIntFar.addEventListener("input", ()=>{
+    randIntFarLabel.textContent = randIntFar.value;
   });
   masterVol.addEventListener("input", ()=>{
     setMasterVolumePct(masterVol.value, false);
@@ -2790,7 +2922,7 @@ function hitNote(mx,my){
     try{
       midiAccess = await navigator.requestMIDIAccess({ sysex:false });
       midiEnabled = true;
-      btnMidi.textContent = "🎛 MIDI: ON";
+      btnMidi.textContent = "MIDI: ON";
       setStatus("MIDI enabled");
       refreshMidiInputs();
       midiAccess.onstatechange = refreshMidiInputs;
@@ -2897,7 +3029,7 @@ function hitNote(mx,my){
     if (!midiEnabled) await enableMidi();
     else {
       midiEnabled = false;
-      btnMidi.textContent = "🎛 MIDI: OFF";
+      btnMidi.textContent = "MIDI: OFF";
       if (midiInput) midiInput.onmidimessage = null;
       midiInput = null;
       activeMidiNotes.clear();
@@ -2942,7 +3074,7 @@ function hitNote(mx,my){
   }
 
   function updatePitchUI(){
-    btnPitch.textContent = pitchMode ? "🎤 Pitch: ON" : "🎤 Pitch: OFF";
+    btnPitch.textContent = pitchMode ? "Pitch: ON" : "Pitch: OFF";
     pitchThreshWrap.style.display = pitchMode ? "" : "none";
     pitchThreshLabel.textContent = pitchRmsThreshold.toFixed(3).replace(/0+$/,'').replace(/\.$/,'');
   }
@@ -3247,10 +3379,10 @@ function hitNote(mx,my){
       return;
     }
     stepInput = !stepInput;
-    btnStepInput.textContent = `⌨️ Step Input: ${stepInput ? "ON" : "OFF"}`;
+    btnStepInput.textContent = `Step Input: ${stepInput ? "ON" : "OFF"}`;
     if (stepInput){
       stepCursor = clamp(quant(stepCursor), 0, TOTAL_STEPS-1);
-      setStatus("Step Input ON (use ←/→, hold MIDI notes)");
+      setStatus("Step Input ON (hold MIDI notes to enter notes)");
     } else {
       // finalize all held notes
       for (const midi of Array.from(stepHeld.keys())) finalizeStepNote(midi);
@@ -3400,7 +3532,17 @@ renderAll();
         toggles: deepClone(ui.toggles),
         follow: ui.follow,
         autoRetune: ui.autoRetune,
-        masterVolumePct: Number(masterVol.value || 85)
+        masterVolumePct: Number(masterVol.value || 85),
+        randomize: {
+          posMode: randPosMode.value,
+          barsSpan: Number(randBarsSpan.value || 4),
+          density: Number(randDensity.value || 8),
+          intervalWeights: {
+            near: Number(randIntNear.value || 6),
+            mid: Number(randIntMid.value || 3),
+            far: Number(randIntFar.value || 1)
+          }
+        }
       }
     };
   }
@@ -3443,13 +3585,28 @@ renderAll();
     if (typeof data.ui?.masterVolumePct === "number"){
       setMasterVolumePct(data.ui.masterVolumePct, false);
     }
-
-    btnToggleDrums.textContent = `🥁 Drums: ${ui.toggles.drums ? "ON":"OFF"}`;
-    btnToggleChords.textContent = `🎸 Chords: ${ui.toggles.chords ? "ON":"OFF"}`;
-    btnToggleAssist.textContent = `🧠 Assist: ${ui.toggles.assist ? "ON":"OFF"}`;
-    btnToggleChordTones.textContent = `🎹 Chord Tones: ${ui.toggles.chordTones ? "ON":"OFF"}`;
-    btnToggleFollow.textContent = `🎯 Follow: ${ui.follow ? "ON":"OFF"}`;
-    btnAutoRetune.textContent = `🪄 AutoRetune: ${ui.autoRetune ? "ON":"OFF"}`;
+    if (data.ui?.randomize){
+      if (typeof data.ui.randomize.posMode === "string") randPosMode.value = data.ui.randomize.posMode;
+      if (typeof data.ui.randomize.barsSpan === "number") randBarsSpan.value = String(clamp(data.ui.randomize.barsSpan, 1, 16));
+      if (typeof data.ui.randomize.density === "number") randDensity.value = String(clamp(data.ui.randomize.density, 2, 16));
+      if (data.ui.randomize.intervalWeights){
+        const iw = data.ui.randomize.intervalWeights;
+        if (typeof iw.near === "number") randIntNear.value = String(clamp(iw.near, 0, 10));
+        if (typeof iw.mid === "number") randIntMid.value = String(clamp(iw.mid, 0, 10));
+        if (typeof iw.far === "number") randIntFar.value = String(clamp(iw.far, 0, 10));
+      }
+      randBarsSpanLabel.textContent = randBarsSpan.value;
+      randDensityLabel.textContent = randDensity.value;
+      randIntNearLabel.textContent = randIntNear.value;
+      randIntMidLabel.textContent = randIntMid.value;
+      randIntFarLabel.textContent = randIntFar.value;
+    }
+    btnToggleDrums.textContent = `Drums: ${ui.toggles.drums ? "ON":"OFF"}`;
+    btnToggleChords.textContent = `Chords: ${ui.toggles.chords ? "ON":"OFF"}`;
+    btnToggleAssist.textContent = `Assist: ${ui.toggles.assist ? "ON":"OFF"}`;
+    btnToggleChordTones.textContent = `Chord Tones: ${ui.toggles.chordTones ? "ON":"OFF"}`;
+    btnToggleFollow.textContent = `Follow: ${ui.follow ? "ON":"OFF"}`;
+    btnAutoRetune.textContent = `AutoRetune: ${ui.autoRetune ? "ON":"OFF"}`;
 
     notes = (data.notes || []).map(n=>({
       step: clamp(Number(n.step)||0, 0, TOTAL_STEPS-1),
@@ -3520,11 +3677,15 @@ renderAll();
 
   // ======== INIT ========
   function init(){
+    setTopTab("input");
     tempoLabel.textContent = tempo.value;
     barsLabel.textContent = bars.value;
     zoomLabel.textContent = zoom.value;
     randBarsSpanLabel.textContent = randBarsSpan.value;
     randDensityLabel.textContent = randDensity.value;
+    randIntNearLabel.textContent = randIntNear.value;
+    randIntMidLabel.textContent = randIntMid.value;
+    randIntFarLabel.textContent = randIntFar.value;
     const storedMaster = Number(localStorage.getItem("masterVolumePct"));
     const initialMaster = Number.isFinite(storedMaster) ? storedMaster : Number(masterVol.value || 85);
     setMasterVolumePct(initialMaster, false);
@@ -3541,14 +3702,13 @@ renderAll();
     resizeCanvases();
     loadDefaultSong();
     for (const n of notes) n.midi = clamp(n.midi, midiMinLimit, midiMaxLimit);
-
-    btnToggleDrums.textContent = "🥁 Drums: ON";
-    btnToggleChords.textContent = "🎸 Chords: ON";
-    btnToggleAssist.textContent = "🧠 Assist: ON";
-    btnToggleChordTones.textContent = "🎹 Chord Tones: ON";
-    btnToggleFollow.textContent = "🎯 Follow: ON";
-    btnAutoRetune.textContent = "🪄 AutoRetune: ON";
-    btnStepInput.textContent = "⌨️ Step Input: OFF";
+    btnToggleDrums.textContent = `Drums: ${ui.toggles.drums ? "ON":"OFF"}`;
+    btnToggleChords.textContent = `Chords: ${ui.toggles.chords ? "ON":"OFF"}`;
+    btnToggleAssist.textContent = `Assist: ${ui.toggles.assist ? "ON":"OFF"}`;
+    btnToggleChordTones.textContent = `Chord Tones: ${ui.toggles.chordTones ? "ON":"OFF"}`;
+    btnToggleFollow.textContent = `Follow: ${ui.follow ? "ON":"OFF"}`;
+    btnAutoRetune.textContent = `AutoRetune: ${ui.autoRetune ? "ON":"OFF"}`;
+    btnStepInput.textContent = "Step Input: OFF";
     updatePitchUI();
 
     rebuildAudio();
@@ -3812,3 +3972,4 @@ if ("serviceWorker" in navigator) {
     });
 }
 </script>
+
