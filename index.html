@@ -505,7 +505,6 @@
   let rafId = null;
   let lastUiTs = 0;
   let pitchRafId = null;
-  let lastFollowTargetX = null;
 
   // ===== scroll usability flags =====
   let syncingScroll = false;
@@ -628,13 +627,13 @@
     try { if (polyChord) polyChord.dispose(); } catch(e){}
     // Limit voices to prevent unbounded OscillatorNode growth
     polyLead = new Tone.PolySynth({
-      maxPolyphony: 24,
+      maxPolyphony: 20,
       voice: Tone.Synth,
       options: { oscillator:{ type: oscType }, envelope:{ attack:0.005, decay:0.08, sustain:0.35, release:0.08 } }
     }).toDestination();
 
     polyChord = new Tone.PolySynth({
-      maxPolyphony: 28,
+      maxPolyphony: 24,
       voice: Tone.Synth,
       options: { oscillator:{ type: "sawtooth" }, envelope:{ attack:0.01, decay:0.12, sustain:0.3, release:0.12 } }
     }).toDestination();
@@ -667,7 +666,7 @@
     const stepDurSec = Math.max(0.02, Tone.Time("16n").toSeconds());
     const now = Tone.now();
     // If callback is late, skip this step instead of sounding audibly behind the grid.
-    const lateLimitSec = Math.max(0.08, stepDurSec * 1.8);
+    const lateLimitSec = Math.max(0.03, stepDurSec * 0.9);
     if (time < (now - lateLimitSec)){
       __stepCursor = (__stepCursor + 1) % TOTAL_STEPS;
       return;
@@ -676,7 +675,7 @@
     // UI (playhead etc.) should stay on RAF thread; just schedule audio here.
     let t = time;
     let leadScheduled = 0;
-    const MAX_LEAD_TRIGGERS_PER_STEP = 32;
+    const MAX_LEAD_TRIGGERS_PER_STEP = 24;
 
     // Melody notes at this step
     for (let i=0;i<notes.length;i++){
@@ -1704,7 +1703,6 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     prevPlayheadXMelody = null;
     prevPlayheadXChord = null;
     playheadFastFrame = 0;
-    lastFollowTargetX = null;
     drawDynamicOverlayOnly();
   }
 
@@ -3031,11 +3029,8 @@ renderAll();
 
   function followScrollToX(x){
     if (!ui.follow) return;
-    if (userScrollActive) return;
     const maxScroll = Math.max(0, melodyCanvas.width - melodyScroll.clientWidth);
     const target = clamp(x - melodyScroll.clientWidth*0.35, 0, maxScroll);
-    if (lastFollowTargetX != null && Math.abs(target - lastFollowTargetX) < 2) return;
-    lastFollowTargetX = target;
     syncingScroll = true;
     try{
       melodyScroll.scrollLeft = target;
@@ -3064,7 +3059,7 @@ renderAll();
 
     if (ui.follow) followScrollToX(stepToX(s));
 
-    drawPlayheadsOnlyFast();
+    drawDynamicOverlayOnly();
     if (isPlaying && !document.hidden) rafId = requestAnimationFrame(tickUI);
   }
 
