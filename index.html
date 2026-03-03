@@ -661,19 +661,25 @@
   }
 
   function __triggerStep(time){
+    compactNotesIfNeeded();
     // UI (playhead etc.) should stay on RAF thread; just schedule audio here.
     let t = time;
+    let leadScheduled = 0;
+    const MAX_LEAD_TRIGGERS_PER_STEP = 12;
 
     // Melody notes at this step
     for (let i=0;i<notes.length;i++){
       const n = notes[i];
+      if (!isValidNoteObj(n)) continue;
       if (n.step !== __stepCursor) continue;
+      if (leadScheduled >= MAX_LEAD_TRIGGERS_PER_STEP) break;
       const durSteps = Math.max(1, n.dur|0);
       const durSec = Math.max(0.02, Tone.Time(stepToTime(durSteps)).toSeconds() - 0.01);
       try { markSoundActivity(); } catch(e) {}
       const tt = safeScheduleTime("lead", t);
       polyLead.triggerAttackRelease(Tone.Frequency(n.midi,"midi").toFrequency(), durSec, tt, n.vel ?? 0.9);
       t = tt + 0.0001;
+      leadScheduled++;
     }
 
     // Chords at this step
@@ -868,6 +874,18 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
   const snapSteps = ()=>Number(snapSelect.value);
   const quant = (step)=> Math.round(step / snapSteps()) * snapSteps();
   const setStatus = (msg)=> statusLeft.innerHTML = `Status: <b>${msg}</b>`;
+  const isValidNoteObj = (n)=> !!n &&
+    Number.isFinite(n.step) &&
+    Number.isFinite(n.dur) &&
+    Number.isFinite(n.midi);
+
+  function compactNotesIfNeeded(){
+    let dirty = false;
+    for (let i=0;i<notes.length;i++){
+      if (!isValidNoteObj(notes[i])) { dirty = true; break; }
+    }
+    if (dirty) notes = notes.filter(isValidNoteObj);
+  }
 
   function stepToX(step){ return step * ui.pxPerStep; }
   function xToStep(x){ return x / ui.pxPerStep; }
@@ -1555,6 +1573,7 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
   }
 
   function renderMelodyStatic(){
+    compactNotesIfNeeded();
     drawGrid(msctx, melodyStaticCanvas.width, melodyStaticCanvas.height, true, false, false);
     const scalePCs = getSelectedScalePCs();
 
@@ -1689,9 +1708,11 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
   }
 
 function hitNote(mx,my){
+    compactNotesIfNeeded();
     const h = noteH();
     for (let i=notes.length-1;i>=0;i--){
       const n = notes[i];
+      if (!isValidNoteObj(n)) continue;
       if (n.midi > viewTopMidi || n.midi < viewBottomMidi()) continue;
       const x0 = stepToX(n.step);
       const x1 = stepToX(n.step+n.dur);
@@ -1721,10 +1742,12 @@ function hitNote(mx,my){
   }
 
   function selectNotesByRect(r){
+    compactNotesIfNeeded();
     mel.sel.set.clear();
     const rr = rectNormalize(r);
     const h = noteH();
     for (const n of notes){
+      if (!isValidNoteObj(n)) continue;
       if (n.midi > viewTopMidi || n.midi < viewBottomMidi()) continue;
       const x0 = stepToX(n.step);
       const x1 = stepToX(n.step+n.dur);
@@ -1737,11 +1760,20 @@ function hitNote(mx,my){
     const {mx,my} = canvasMousePos(melodyCanvas, e);
 
     if (mel.drag.mode){
+      if (mel.drag.mode === "pan"){
+        // Pan is handled by window mousemove to keep drag responsive outside canvas.
+        return;
+      }
       if (mel.drag.mode === "select"){
         mel.sel.rect.w = mx - mel.drag.startX;
         mel.sel.rect.h = my - mel.drag.startY;
         selectNotesByRect(mel.sel.rect);
         renderAll();
+        return;
+      }
+      if (!mel.drag.orig || !Number.isFinite(mel.drag.orig.midi)){
+        mel.drag.mode = null;
+        mel.drag.ghost = null;
         return;
       }
 
@@ -1855,6 +1887,10 @@ function hitNote(mx,my){
     if (mel.drag.mode === "move"){
       pushUndo("Move note");
       const n = mel.drag.target;
+      if (!isValidNoteObj(n) || !mel.drag.orig){
+        mel.drag.mode = null; mel.drag.ghost = null;
+        return;
+      }
       n.step = clamp(quant(mel.drag.orig.step + dxSteps), 0, TOTAL_STEPS-1);
       n.midi = clamp(mel.drag.orig.midi + dyMidi, midiMinLimit, midiMaxLimit);
       if (n.step + n.dur > TOTAL_STEPS) n.dur = Math.max(1, TOTAL_STEPS - n.step);
@@ -1866,6 +1902,10 @@ function hitNote(mx,my){
     if (mel.drag.mode === "resize"){
       pushUndo("Resize note");
       const n = mel.drag.target;
+      if (!isValidNoteObj(n) || !mel.drag.orig){
+        mel.drag.mode = null; mel.drag.ghost = null;
+        return;
+      }
       n.dur = clamp(quant(mel.drag.orig.dur + dxSteps), snapSteps(), TOTAL_STEPS - n.step);
       mel.drag.mode = null; mel.drag.ghost = null;
       rebuildAudio(); renderAll(); setStatus("Note resized");
