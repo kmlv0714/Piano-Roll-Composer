@@ -387,16 +387,6 @@
   const mctx = melodyCanvas.getContext("2d");
   const cctx = chordCanvas.getContext("2d");
   const pctx = pitchCanvas.getContext("2d");
-  const rulerStaticCanvas = document.createElement("canvas");
-  const melodyStaticCanvas = document.createElement("canvas");
-  const chordStaticCanvas = document.createElement("canvas");
-  const rsctx = rulerStaticCanvas.getContext("2d");
-  const msctx = melodyStaticCanvas.getContext("2d");
-  const csctx = chordStaticCanvas.getContext("2d");
-  let prevPlayheadXRuler = null;
-  let prevPlayheadXMelody = null;
-  let prevPlayheadXChord = null;
-  let playheadFastFrame = 0;
 
   const melodyScroll = document.getElementById("melodyScroll");
   const rulerScroll  = document.getElementById("rulerScroll");
@@ -491,8 +481,6 @@
   let pitchLastTimeMs = null;
   let pitchRequiredStableMs = 120; // ms
   let pitchPrevRenderMidi = null;
-  let pitchSampleRate = 44100;
-  let sharedAudioContextRef = null;
 
 
   // Step-input (keyboard-driven) mode
@@ -504,7 +492,6 @@
   let playStepFloat = 0;
   let rafId = null;
   let lastUiTs = 0;
-  let pitchRafId = null;
 
   // ===== scroll usability flags =====
   let syncingScroll = false;
@@ -627,15 +614,15 @@
     try { if (polyChord) polyChord.dispose(); } catch(e){}
     // Limit voices to prevent unbounded OscillatorNode growth
     polyLead = new Tone.PolySynth({
-      maxPolyphony: 20,
+      maxPolyphony: 8,
       voice: Tone.Synth,
-      options: { oscillator:{ type: oscType }, envelope:{ attack:0.005, decay:0.08, sustain:0.35, release:0.08 } }
+      options: { oscillator:{ type: oscType }, envelope:{ attack:0.005, decay:0.08, sustain:0.4, release:0.12 } }
     }).toDestination();
 
     polyChord = new Tone.PolySynth({
-      maxPolyphony: 24,
+      maxPolyphony: 12,
       voice: Tone.Synth,
-      options: { oscillator:{ type: "sawtooth" }, envelope:{ attack:0.01, decay:0.12, sustain:0.3, release:0.12 } }
+      options: { oscillator:{ type: "sawtooth" }, envelope:{ attack:0.01, decay:0.12, sustain:0.35, release:0.18 } }
     }).toDestination();
   }
   rebuildPolySynths();
@@ -650,46 +637,20 @@
 
   let __repeatId = null;
   let __stepCursor = 0;
-  const __lastScheduledByVoice = Object.create(null);
-
-  function safeScheduleTime(voiceKey, proposedTime){
-    const eps = 0.0002;
-    const nowFloor = Tone.now() + 0.001;
-    const last = __lastScheduledByVoice[voiceKey] ?? -Infinity;
-    const t = Math.max(proposedTime, last + eps, nowFloor);
-    __lastScheduledByVoice[voiceKey] = t;
-    return t;
-  }
 
   function __triggerStep(time){
-    compactNotesIfNeeded();
-    const stepDurSec = Math.max(0.02, Tone.Time("16n").toSeconds());
-    const now = Tone.now();
-    // If callback is late, skip this step instead of sounding audibly behind the grid.
-    const lateLimitSec = Math.max(0.03, stepDurSec * 0.9);
-    if (time < (now - lateLimitSec)){
-      __stepCursor = (__stepCursor + 1) % TOTAL_STEPS;
-      return;
-    }
-
     // UI (playhead etc.) should stay on RAF thread; just schedule audio here.
     let t = time;
-    let leadScheduled = 0;
-    const MAX_LEAD_TRIGGERS_PER_STEP = 24;
 
     // Melody notes at this step
     for (let i=0;i<notes.length;i++){
       const n = notes[i];
-      if (!isValidNoteObj(n)) continue;
       if (n.step !== __stepCursor) continue;
-      if (leadScheduled >= MAX_LEAD_TRIGGERS_PER_STEP) break;
       const durSteps = Math.max(1, n.dur|0);
       const durSec = Math.max(0.02, Tone.Time(stepToTime(durSteps)).toSeconds() - 0.01);
       try { markSoundActivity(); } catch(e) {}
-      const tt = safeScheduleTime("lead", t);
-      polyLead.triggerAttackRelease(Tone.Frequency(n.midi,"midi").toFrequency(), durSec, tt, n.vel ?? 0.9);
-      t = tt + 0.0001;
-      leadScheduled++;
+      polyLead.triggerAttackRelease(Tone.Frequency(n.midi,"midi").toFrequency(), durSec, t, n.vel ?? 0.9);
+      t += 0.0001;
     }
 
     // Chords at this step
@@ -702,42 +663,22 @@
         const freqs = mids.map(m=>Tone.Frequency(m,"midi").toFrequency());
         const durSec = Math.max(0.03, Tone.Time(stepToTime(Math.max(1,c.dur|0))).toSeconds() - 0.01);
         try { markSoundActivity(); } catch(e) {}
-        const tt = safeScheduleTime("chord", t);
-        polyChord.triggerAttackRelease(freqs, durSec, tt, 0.6);
-        t = tt + 0.0001;
+        polyChord.triggerAttackRelease(freqs, durSec, t, 0.6);
+        t += 0.0001;
       }
     }
 
     // Drums pattern (same as original)
     if (ui.toggles.drums){
       const inBar = __stepCursor % STEPS_PER_BAR;
-      const drumDur = Math.max(0.01, stepDurSec * 0.82);
       try { markSoundActivity(); } catch(e) {}
-      {
-        const tt = safeScheduleTime("hat", t);
-        hat.triggerAttackRelease(drumDur, tt, (inBar%2===0)?0.35:0.25);
-        t = tt + 0.0001;
-      }
-      if (inBar===0 || inBar===6 || inBar===8 || inBar===14) {
-        const tt = safeScheduleTime("kick", t);
-        kick.triggerAttackRelease("C1", drumDur, tt, 0.9);
-        t = tt + 0.0001;
-      }
-      if (inBar===4 || inBar===12) {
-        const tt = safeScheduleTime("snare", t);
-        snare.triggerAttackRelease(drumDur, tt, 0.6);
-        t = tt + 0.0001;
-      }
-      if (__stepCursor===0) {
-        const tt = safeScheduleTime("crash", t);
-        crash.triggerAttackRelease(Math.max(0.03, stepDurSec * 1.6), tt, 0.55);
-        t = tt + 0.0001;
-      }
+      hat.triggerAttackRelease("16n", t, (inBar%2===0)?0.35:0.25); t += 0.0001;
+      if (inBar===0 || inBar===6 || inBar===8 || inBar===14) { kick.triggerAttackRelease("C1","16n",t,0.9); t += 0.0001; }
+      if (inBar===4 || inBar===12) { snare.triggerAttackRelease("16n",t,0.6); t += 0.0001; }
+      if (__stepCursor===0) { crash.triggerAttackRelease("8n",t,0.55); t += 0.0001; }
       const lastBarStart = (TOTAL_BARS-1) * STEPS_PER_BAR;
       if (__stepCursor>=lastBarStart && inBar>=8 && inBar%2===0){
-        const tt = safeScheduleTime("tom", t);
-        tom.triggerAttackRelease((inBar<12)?"C2":"G2", drumDur, tt, 0.55);
-        t = tt + 0.0001;
+        tom.triggerAttackRelease((inBar<12)?"C2":"G2","16n",t,0.55); t += 0.0001;
       }
     }
 
@@ -747,9 +688,6 @@
   function startStablePlayback(){
     // Ensure loopEnd consistent
     rebuildAudio();
-    // Reset playback synth state to avoid stale scheduled times across restart loops.
-    rebuildPolySynths();
-    rebuildDrumSynths();
 
     // Clear previous schedules
     if (__repeatId != null){
@@ -760,7 +698,6 @@
     Tone.Transport.cancel(0);
 
     __stepCursor = 0;
-    for (const k in __lastScheduledByVoice) delete __lastScheduledByVoice[k];
     __repeatId = Tone.Transport.scheduleRepeat(__triggerStep, "16n");
     Tone.Transport.start("+0.02");
   }
@@ -779,11 +716,28 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     envelope:{ attack:0.01, decay:0.12, sustain:0.35, release:0.25 }
   });
 
-  let kick = null;
-  let snare = null;
-  let hat = null;
-  let crash = null;
-  let tom = null;
+  const kick = new Tone.MembraneSynth({
+    pitchDecay:0.02, octaves:6,
+    envelope:{attack:0.001, decay:0.22, sustain:0, release:0.06}
+  });
+  const snare = new Tone.NoiseSynth({
+    noise:{type:"white"},
+    envelope:{attack:0.001, decay:0.13, sustain:0}
+  });
+  const hat = new Tone.MetalSynth({
+    frequency: 250,
+    envelope:{attack:0.001, decay:0.06, release:0.01},
+    harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.3
+  });
+  const crash = new Tone.MetalSynth({
+    frequency: 180,
+    envelope:{attack:0.001, decay:0.6, release:0.01},
+    harmonicity: 5.5, modulationIndex: 20, resonance: 6000, octaves: 1.5
+  });
+  const tom = new Tone.MembraneSynth({
+    pitchDecay:0.01, octaves:4,
+    envelope:{attack:0.001, decay:0.16, sustain:0, release:0.05}
+  });
 
   chordSynth.chain(reverb, limiter, Tone.Destination);
 
@@ -831,50 +785,11 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
   buildMonitorSynth();
 
 
-  function rebuildDrumSynths(){
-    try{ if (kick) kick.dispose(); }catch(e){}
-    try{ if (snare) snare.dispose(); }catch(e){}
-    try{ if (hat) hat.dispose(); }catch(e){}
-    try{ if (crash) crash.dispose(); }catch(e){}
-    try{ if (tom) tom.dispose(); }catch(e){}
-
-    kick = new Tone.MembraneSynth({
-      pitchDecay:0.02, octaves:6,
-      envelope:{attack:0.001, decay:0.22, sustain:0, release:0.06}
-    });
-    snare = new Tone.NoiseSynth({
-      noise:{type:"white"},
-      envelope:{attack:0.001, decay:0.13, sustain:0}
-    });
-    // MetalSynth can throw timeline-order errors under dense loop restarts in some browsers.
-    // Use NoiseSynth for cymbal voices to keep scheduling stable.
-    hat = new Tone.NoiseSynth({
-      noise:{ type:"white" },
-      envelope:{attack:0.001, decay:0.05, sustain:0, release:0.01}
-    });
-    crash = new Tone.NoiseSynth({
-      noise:{ type:"white" },
-      envelope:{attack:0.001, decay:0.35, sustain:0, release:0.01}
-    });
-    tom = new Tone.MembraneSynth({
-      pitchDecay:0.01, octaves:4,
-      envelope:{attack:0.001, decay:0.16, sustain:0, release:0.05}
-    });
-
-    // Keep enough headroom to avoid drum bus breakup under dense playback.
-    kick.volume.value = -4;
-    snare.volume.value = -11;
-    hat.volume.value = -18;
-    crash.volume.value = -16;
-    tom.volume.value = -9;
-
-    kick.chain(limiter, Tone.Destination);
-    snare.chain(reverb, limiter, Tone.Destination);
-    hat.chain(limiter, Tone.Destination);
-    crash.chain(reverb, limiter, Tone.Destination);
-    tom.chain(reverb, limiter, Tone.Destination);
-  }
-  rebuildDrumSynths();
+  kick.chain(limiter, Tone.Destination);
+  snare.chain(reverb, limiter, Tone.Destination);
+  hat.chain(limiter, Tone.Destination);
+  crash.chain(reverb, limiter, Tone.Destination);
+  tom.chain(reverb, limiter, Tone.Destination);
 
   Tone.Transport.timeSignature = 4;
   Tone.Transport.bpm.value = Number(tempo.value);
@@ -890,18 +805,6 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
   const snapSteps = ()=>Number(snapSelect.value);
   const quant = (step)=> Math.round(step / snapSteps()) * snapSteps();
   const setStatus = (msg)=> statusLeft.innerHTML = `Status: <b>${msg}</b>`;
-  const isValidNoteObj = (n)=> !!n &&
-    Number.isFinite(n.step) &&
-    Number.isFinite(n.dur) &&
-    Number.isFinite(n.midi);
-
-  function compactNotesIfNeeded(){
-    let dirty = false;
-    for (let i=0;i<notes.length;i++){
-      if (!isValidNoteObj(notes[i])) { dirty = true; break; }
-    }
-    if (dirty) notes = notes.filter(isValidNoteObj);
-  }
 
   function stepToX(step){ return step * ui.pxPerStep; }
   function xToStep(x){ return x / ui.pxPerStep; }
@@ -916,13 +819,6 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     rulerCanvas.width  = melodyCanvas.width;
     chordCanvas.width  = Math.max(1, TOTAL_STEPS * ui.pxPerStep);
     pitchCanvas.width  = 100;
-
-    rulerStaticCanvas.width = rulerCanvas.width;
-    rulerStaticCanvas.height = rulerCanvas.height;
-    melodyStaticCanvas.width = melodyCanvas.width;
-    melodyStaticCanvas.height = melodyCanvas.height;
-    chordStaticCanvas.width = chordCanvas.width;
-    chordStaticCanvas.height = chordCanvas.height;
   }
 
   function viewBottomMidi(){ return viewTopMidi - (VIEW_ROWS - 1); }
@@ -1332,7 +1228,7 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
   }
 
   // ======== RENDER ========
-  function drawGrid(ctx, w, h, isMelody, showPlayhead, showCursor){
+  function drawGrid(ctx, w, h, isMelody){
     ctx.clearRect(0,0,w,h);
     ctx.fillStyle = "rgba(0,0,0,0.22)";
     ctx.fillRect(0,0,w,h);
@@ -1366,13 +1262,13 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
       }
     }
 
-    if (showPlayhead && isPlaying){
+    if (isPlaying){
       const x = stepToX(playStepFloat % TOTAL_STEPS);
       ctx.strokeStyle = "rgba(56,189,248,0.90)";
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
     }
-    if (showCursor && !isPlaying){
+        if (!isPlaying){
       const x = stepToX(stepCursor);
       ctx.strokeStyle = "rgba(255,255,255,0.70)";
       ctx.lineWidth = 2;
@@ -1382,121 +1278,48 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     }
   }
 
-  function drawPlayCursorLines(ctx, h){
-    if (isPlaying){
-      const x = stepToX(playStepFloat % TOTAL_STEPS);
-      ctx.strokeStyle = "rgba(56,189,248,0.90)";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, h);
-      ctx.stroke();
-      return;
-    }
-    const x = stepToX(stepCursor);
-    ctx.strokeStyle = "rgba(255,255,255,0.70)";
-    ctx.lineWidth = 2;
-    ctx.setLineDash([8,6]);
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, h);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
 
-
-  function renderRulerStatic(){
-    const w = rulerStaticCanvas.width, h = rulerStaticCanvas.height;
-    rsctx.clearRect(0,0,w,h);
-    rsctx.fillStyle = "rgba(0,0,0,0.20)";
-    rsctx.fillRect(0,0,w,h);
+  function renderRuler(){
+    const w = rulerCanvas.width, h = rulerCanvas.height;
+    rctx.clearRect(0,0,w,h);
+    rctx.fillStyle = "rgba(0,0,0,0.20)";
+    rctx.fillRect(0,0,w,h);
 
     // bar blocks
     for (let b=0; b<TOTAL_BARS; b++){
       const x0 = stepToX(b * STEPS_PER_BAR);
       const x1 = stepToX((b+1) * STEPS_PER_BAR);
-      rsctx.fillStyle = (b%2===0) ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.01)";
-      rsctx.fillRect(x0, 0, x1-x0, h);
+      rctx.fillStyle = (b%2===0) ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.01)";
+      rctx.fillRect(x0, 0, x1-x0, h);
 
       // bar line
-      rsctx.strokeStyle = "rgba(160,190,255,0.22)";
-      rsctx.lineWidth = 2;
-      rsctx.beginPath(); rsctx.moveTo(x0+0.5, 0); rsctx.lineTo(x0+0.5, h); rsctx.stroke();
+      rctx.strokeStyle = "rgba(160,190,255,0.22)";
+      rctx.lineWidth = 2;
+      rctx.beginPath(); rctx.moveTo(x0+0.5, 0); rctx.lineTo(x0+0.5, h); rctx.stroke();
 
       // label
-      rsctx.fillStyle = "rgba(220,235,255,0.85)";
-      rsctx.font = "800 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace";
-      rsctx.textBaseline = "middle";
-      rsctx.fillText(String(b+1), x0 + 8, h/2);
+      rctx.fillStyle = "rgba(220,235,255,0.85)";
+      rctx.font = "800 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace";
+      rctx.textBaseline = "middle";
+      rctx.fillText(String(b+1), x0 + 8, h/2);
     }
 
     // minor ticks (beats)
-    rsctx.strokeStyle = "rgba(160,190,255,0.14)";
-    rsctx.lineWidth = 1;
+    rctx.strokeStyle = "rgba(160,190,255,0.14)";
+    rctx.lineWidth = 1;
     for (let s=0; s<=TOTAL_STEPS; s+=4){
       const x = stepToX(s)+0.5;
       const tall = (s % STEPS_PER_BAR === 0) ? h : (s % 8 === 0 ? h*0.72 : h*0.55);
-      rsctx.beginPath(); rsctx.moveTo(x, h); rsctx.lineTo(x, h - tall); rsctx.stroke();
+      rctx.beginPath(); rctx.moveTo(x, h); rctx.lineTo(x, h - tall); rctx.stroke();
     }
-  }
 
-  function drawRulerPlayhead(){
-    rctx.clearRect(0,0,rulerCanvas.width,rulerCanvas.height);
-    rctx.drawImage(rulerStaticCanvas, 0, 0);
-    const h = rulerCanvas.height;
-    const x = Math.round(isPlaying ? stepToX(playStepFloat % TOTAL_STEPS) : stepToX(stepCursor)) + 0.5;
+    // cursor / playhead
+    const x = isPlaying ? stepToX(playStepFloat % TOTAL_STEPS) : stepToX(stepCursor);
     rctx.strokeStyle = isPlaying ? "rgba(56,189,248,0.95)" : "rgba(255,255,255,0.72)";
     rctx.lineWidth = 2;
     rctx.setLineDash(isPlaying ? [] : [8,6]);
     rctx.beginPath(); rctx.moveTo(x, 0); rctx.lineTo(x, h); rctx.stroke();
     rctx.setLineDash([]);
-  }
-
-  function restoreStripe(ctx, srcCanvas, x, h){
-    const pad = 14;
-    const sx = Math.max(0, Math.floor(x - pad));
-    const sw = Math.min(srcCanvas.width - sx, pad * 2 + 1);
-    if (sw <= 0) return;
-    ctx.drawImage(srcCanvas, sx, 0, sw, h, sx, 0, sw, h);
-  }
-
-  function drawPlayheadLine(ctx, x, h){
-    if (isPlaying){
-      ctx.strokeStyle = "rgba(56,189,248,0.90)";
-      ctx.lineWidth = 2;
-      ctx.setLineDash([]);
-    } else {
-      ctx.strokeStyle = "rgba(255,255,255,0.72)";
-      ctx.lineWidth = 2;
-      ctx.setLineDash([8,6]);
-    }
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, h);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  function drawPlayheadsOnlyFast(){
-    const x = Math.round(isPlaying ? stepToX(playStepFloat % TOTAL_STEPS) : stepToX(stepCursor)) + 0.5;
-    playheadFastFrame++;
-
-    // Restore only the visible viewport area from static layers each frame.
-    // This avoids playhead trails while keeping cost much lower than full-canvas redraw.
-    const rvx = Math.max(0, Math.floor(rulerScroll.scrollLeft) - 32);
-    const rvw = Math.min(rulerCanvas.width - rvx, Math.ceil(rulerScroll.clientWidth) + 64);
-    if (rvw > 0) rctx.drawImage(rulerStaticCanvas, rvx, 0, rvw, rulerCanvas.height, rvx, 0, rvw, rulerCanvas.height);
-    drawPlayheadLine(rctx, x, rulerCanvas.height);
-
-    const mvx = Math.max(0, Math.floor(melodyScroll.scrollLeft) - 32);
-    const mvw = Math.min(melodyCanvas.width - mvx, Math.ceil(melodyScroll.clientWidth) + 64);
-    if (mvw > 0) mctx.drawImage(melodyStaticCanvas, mvx, 0, mvw, melodyCanvas.height, mvx, 0, mvw, melodyCanvas.height);
-    drawPlayheadLine(mctx, x, melodyCanvas.height);
-
-    const cvx = Math.max(0, Math.floor(chordScroll.scrollLeft) - 32);
-    const cvw = Math.min(chordCanvas.width - cvx, Math.ceil(chordScroll.clientWidth) + 64);
-    if (cvw > 0) cctx.drawImage(chordStaticCanvas, cvx, 0, cvw, chordCanvas.height, cvx, 0, cvw, chordCanvas.height);
-    drawPlayheadLine(cctx, x, chordCanvas.height);
   }
 
   function renderPitchSidebar(){
@@ -1562,7 +1385,7 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     pctx.stroke();
   }
 
-  function drawNote(ctx, n, scalePCs){
+  function drawNote(n){
     if (n.midi > viewTopMidi || n.midi < viewBottomMidi()) return;
 
     const x0 = stepToX(n.step);
@@ -1570,6 +1393,7 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     const y = midiToY(n.midi);
     const h = noteH();
 
+    const scalePCs = getSelectedScalePCs();
     const segs = ui.toggles.assist ? splitByChord(n.step, n.dur) : [{step:n.step,dur:n.dur}];
 
     for (const seg of segs){
@@ -1581,24 +1405,22 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
       const sx0 = stepToX(seg.step);
       const sw  = Math.max(6, stepToX(seg.step + seg.dur) - sx0);
 
-      ctx.fillStyle = fill;
-      roundRect(ctx, sx0, y+1, sw, h-2, 10);
-      ctx.fill();
+      mctx.fillStyle = fill;
+      roundRect(mctx, sx0, y+1, sw, h-2, 10);
+      mctx.fill();
     }
 
-    ctx.strokeStyle = mel.sel.set.has(n) ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.22)";
-    ctx.lineWidth = mel.sel.set.has(n) ? 2 : 1;
-    roundRect(ctx, x0, y+1, w, h-2, 10);
-    ctx.stroke();
+    mctx.strokeStyle = mel.sel.set.has(n) ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.22)";
+    mctx.lineWidth = mel.sel.set.has(n) ? 2 : 1;
+    roundRect(mctx, x0, y+1, w, h-2, 10);
+    mctx.stroke();
 
-    ctx.fillStyle = "rgba(255,255,255,0.26)";
-    ctx.fillRect(x0 + w - 6, y+3, 4, h-6);
+    mctx.fillStyle = "rgba(255,255,255,0.26)";
+    mctx.fillRect(x0 + w - 6, y+3, 4, h-6);
   }
 
-  function renderMelodyStatic(){
-    compactNotesIfNeeded();
-    drawGrid(msctx, melodyStaticCanvas.width, melodyStaticCanvas.height, true, false, false);
-    const scalePCs = getSelectedScalePCs();
+  function renderMelody(){
+    drawGrid(mctx, melodyCanvas.width, melodyCanvas.height, true);
 
     if (ui.toggles.chordTones && chords.length){
       for (const c of chords){
@@ -1611,8 +1433,8 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
           const pc = ((midi%12)+12)%12;
           if (info.tones.includes(pc)){
             const y = i * rowH();
-            msctx.fillStyle = "rgba(170,180,200,0.10)";
-            msctx.fillRect(x0, y, (x1-x0), rowH());
+            mctx.fillStyle = "rgba(170,180,200,0.10)";
+            mctx.fillRect(x0, y, (x1-x0), rowH());
           }
         }
       }
@@ -1623,87 +1445,65 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
       for (const midi of activeMidiNotes){
         if (midi > viewTopMidi || midi < viewBottomMidi()) continue;
         const y = midiToY(midi);
-        msctx.fillStyle = "rgba(56,189,248,0.10)";
-        msctx.fillRect(0, y, melodyStaticCanvas.width, rowH());
+        mctx.fillStyle = "rgba(56,189,248,0.10)";
+        mctx.fillRect(0, y, melodyCanvas.width, rowH());
       }
     }
 
-    for (const n of notes) drawNote(msctx, n, scalePCs);
+    for (const n of notes) drawNote(n);
+
+    if (mel.sel.active) drawSelectionRect(mctx, mel.sel.rect);
+    if (mel.drag.ghost) drawGhostRect(mctx, mel.drag.ghost);
 
     renderPitchSidebar();
   }
 
-  function drawMelodyDynamic(){
-    mctx.clearRect(0, 0, melodyCanvas.width, melodyCanvas.height);
-    mctx.drawImage(melodyStaticCanvas, 0, 0);
-    if (mel.sel.active) drawSelectionRect(mctx, mel.sel.rect);
-    if (mel.drag.ghost) drawGhostRect(mctx, mel.drag.ghost);
-    drawPlayCursorLines(mctx, melodyCanvas.height);
-  }
-
-  function drawChordBlock(ctx, c, scalePCs){
+  function drawChordBlock(c){
     const x0 = stepToX(c.start);
     const w = Math.max(10, stepToX(c.start + c.dur) - x0);
     const y = 10;
     const h = chordCanvas.height - 20;
 
+    const scalePCs = getSelectedScalePCs();
     const fits = chordFitsScale(c.chord, scalePCs);
 
-    ctx.fillStyle = fits ? "rgba(34,197,94,0.18)" : "rgba(124,58,237,0.20)";
-    roundRect(ctx, x0, y, w, h, 12);
-    ctx.fill();
+    cctx.fillStyle = fits ? "rgba(34,197,94,0.18)" : "rgba(124,58,237,0.20)";
+    roundRect(cctx, x0, y, w, h, 12);
+    cctx.fill();
 
-    ctx.strokeStyle = cho.sel.set.has(c)
+    cctx.strokeStyle = cho.sel.set.has(c)
       ? "rgba(255,255,255,0.70)"
       : (fits ? "rgba(34,197,94,0.48)" : "rgba(255,255,255,0.18)");
-    ctx.lineWidth = cho.sel.set.has(c) ? 2 : 1;
-    roundRect(ctx, x0, y, w, h, 12);
-    ctx.stroke();
+    cctx.lineWidth = cho.sel.set.has(c) ? 2 : 1;
+    roundRect(cctx, x0, y, w, h, 12);
+    cctx.stroke();
 
-    ctx.fillStyle = "rgba(255,255,255,0.92)";
-    ctx.font = "900 13px ui-sans-serif,system-ui";
-    ctx.fillText(c.chord, x0 + 10, y + 20);
+    cctx.fillStyle = "rgba(255,255,255,0.92)";
+    cctx.font = "900 13px ui-sans-serif,system-ui";
+    cctx.fillText(c.chord, x0 + 10, y + 20);
 
     const rn = chordRomanLabel(c.chord);
     if (rn){
-      ctx.fillStyle = "rgba(255,255,255,0.62)";
-      ctx.font = "800 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace";
-      ctx.fillText(rn, x0 + 10 + ctx.measureText(c.chord).width + 10, y + 20);
+      cctx.fillStyle = "rgba(255,255,255,0.62)";
+      cctx.font = "800 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace";
+      cctx.fillText(rn, x0 + 10 + cctx.measureText(c.chord).width + 10, y + 20);
     }
 
-    ctx.fillStyle = "rgba(255,255,255,0.22)";
-    ctx.fillRect(x0 + w - 6, y+6, 4, h-12);
+    cctx.fillStyle = "rgba(255,255,255,0.22)";
+    cctx.fillRect(x0 + w - 6, y+6, 4, h-12);
   }
 
-  function renderChordsStatic(){
-    drawGrid(csctx, chordStaticCanvas.width, chordStaticCanvas.height, false, false, false);
-    const scalePCs = getSelectedScalePCs();
-    for (const c of chords) drawChordBlock(csctx, c, scalePCs);
-  }
-
-  function drawChordsDynamic(){
-    cctx.clearRect(0, 0, chordCanvas.width, chordCanvas.height);
-    cctx.drawImage(chordStaticCanvas, 0, 0);
+  function renderChords(){
+    drawGrid(cctx, chordCanvas.width, chordCanvas.height, false);
+    for (const c of chords) drawChordBlock(c);
     if (cho.sel.active) drawSelectionRect(cctx, cho.sel.rect);
     if (cho.drag.ghost) drawGhostRect(cctx, cho.drag.ghost);
-    drawPlayCursorLines(cctx, chordCanvas.height);
-  }
-
-  function drawDynamicOverlayOnly(){
-    drawRulerPlayhead();
-    drawMelodyDynamic();
-    drawChordsDynamic();
   }
 
   function renderAll(){
-    renderRulerStatic();
-    renderMelodyStatic();
-    renderChordsStatic();
-    prevPlayheadXRuler = null;
-    prevPlayheadXMelody = null;
-    prevPlayheadXChord = null;
-    playheadFastFrame = 0;
-    drawDynamicOverlayOnly();
+    renderRuler();
+    renderMelody();
+    renderChords();
   }
 
   // ======== HIT TEST + INTERACTION ========
@@ -1732,11 +1532,9 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
   }
 
 function hitNote(mx,my){
-    compactNotesIfNeeded();
     const h = noteH();
     for (let i=notes.length-1;i>=0;i--){
       const n = notes[i];
-      if (!isValidNoteObj(n)) continue;
       if (n.midi > viewTopMidi || n.midi < viewBottomMidi()) continue;
       const x0 = stepToX(n.step);
       const x1 = stepToX(n.step+n.dur);
@@ -1766,12 +1564,10 @@ function hitNote(mx,my){
   }
 
   function selectNotesByRect(r){
-    compactNotesIfNeeded();
     mel.sel.set.clear();
     const rr = rectNormalize(r);
     const h = noteH();
     for (const n of notes){
-      if (!isValidNoteObj(n)) continue;
       if (n.midi > viewTopMidi || n.midi < viewBottomMidi()) continue;
       const x0 = stepToX(n.step);
       const x1 = stepToX(n.step+n.dur);
@@ -1784,20 +1580,11 @@ function hitNote(mx,my){
     const {mx,my} = canvasMousePos(melodyCanvas, e);
 
     if (mel.drag.mode){
-      if (mel.drag.mode === "pan"){
-        // Pan is handled by window mousemove to keep drag responsive outside canvas.
-        return;
-      }
       if (mel.drag.mode === "select"){
         mel.sel.rect.w = mx - mel.drag.startX;
         mel.sel.rect.h = my - mel.drag.startY;
         selectNotesByRect(mel.sel.rect);
         renderAll();
-        return;
-      }
-      if (!mel.drag.orig || !Number.isFinite(mel.drag.orig.midi)){
-        mel.drag.mode = null;
-        mel.drag.ghost = null;
         return;
       }
 
@@ -1904,22 +1691,13 @@ function hitNote(mx,my){
       return;
     }
 
-    if (mel.drag.mode === "pan"){
-      // Pan completion is centralized in window mouseup handler.
-      return;
-    }
-
     const {mx,my} = canvasMousePos(melodyCanvas, e);
     const dxSteps = quant(xToStep(mx) - xToStep(mel.drag.startX));
+    const dyMidi = yToMidi(my) - mel.drag.orig.midi;
 
     if (mel.drag.mode === "move"){
       pushUndo("Move note");
       const n = mel.drag.target;
-      if (!isValidNoteObj(n) || !mel.drag.orig){
-        mel.drag.mode = null; mel.drag.ghost = null;
-        return;
-      }
-      const dyMidi = yToMidi(my) - mel.drag.orig.midi;
       n.step = clamp(quant(mel.drag.orig.step + dxSteps), 0, TOTAL_STEPS-1);
       n.midi = clamp(mel.drag.orig.midi + dyMidi, midiMinLimit, midiMaxLimit);
       if (n.step + n.dur > TOTAL_STEPS) n.dur = Math.max(1, TOTAL_STEPS - n.step);
@@ -1931,10 +1709,6 @@ function hitNote(mx,my){
     if (mel.drag.mode === "resize"){
       pushUndo("Resize note");
       const n = mel.drag.target;
-      if (!isValidNoteObj(n) || !mel.drag.orig){
-        mel.drag.mode = null; mel.drag.ghost = null;
-        return;
-      }
       n.dur = clamp(quant(mel.drag.orig.dur + dxSteps), snapSteps(), TOTAL_STEPS - n.step);
       mel.drag.mode = null; mel.drag.ghost = null;
       rebuildAudio(); renderAll(); setStatus("Note resized");
@@ -1943,16 +1717,11 @@ function hitNote(mx,my){
 
     if (mel.drag.mode === "moveSelection"){
       pushUndo("Move selection");
-      if (!mel.drag.orig || !Number.isFinite(mel.drag.orig.midi)){
-        mel.drag.mode = null; mel.drag.ghost = null;
-        return;
-      }
       const selected = Array.from(mel.sel.set);
       if (selected.length){
         const dx = dxSteps;
         const dy = yToMidi(my) - mel.drag.orig.midi;
         for (const n of selected){
-          if (!isValidNoteObj(n)) continue;
           n.step = clamp(quant(n.step + dx), 0, TOTAL_STEPS-1);
           n.midi = clamp(n.midi + dy, midiMinLimit, midiMaxLimit);
           if (n.step + n.dur > TOTAL_STEPS) n.dur = Math.max(1, TOTAL_STEPS - n.step);
@@ -2682,22 +2451,15 @@ function hitNote(mx,my){
 
   // --- Mic pitch highlight UI ---
   function getSharedAudioContext(){
-    if (sharedAudioContextRef) return sharedAudioContextRef;
     // Prefer Tone.js context to avoid multiple contexts fighting autoplay policy.
     try{
-      const T = window.Tone;
-      if (T && T.getContext){
-        const tc = T.getContext();
-        sharedAudioContextRef = tc.rawContext || tc._context || tc.context || tc;
-        return sharedAudioContextRef;
+      if (Tone && Tone.getContext){
+        const tc = Tone.getContext();
+        return tc.rawContext || tc._context || tc.context || tc;
       }
-      if (T && T.context){
-        sharedAudioContextRef = T.context.rawContext || T.context._context || T.context;
-        return sharedAudioContextRef;
-      }
+      if (Tone && Tone.context) return Tone.context.rawContext || Tone.context._context || Tone.context;
     }catch(e){}
-    sharedAudioContextRef = new (window.AudioContext || window.webkitAudioContext)();
-    return sharedAudioContextRef;
+    return new (window.AudioContext || window.webkitAudioContext)();
   }
 
   function updatePitchUI(){
@@ -2762,7 +2524,6 @@ function hitNote(mx,my){
     pitchAnalyser = ctx.createAnalyser();
     pitchAnalyser.fftSize = 2048;
     pitchAnalyser.smoothingTimeConstant = 0.0;
-    pitchSampleRate = ctx.sampleRate || 44100;
 
     src.connect(pitchAnalyser);
     pitchBuf = new Float32Array(pitchAnalyser.fftSize);
@@ -2773,8 +2534,7 @@ function hitNote(mx,my){
     pitchRequiredStableMs = 120;
 
 
-    if (pitchRafId) cancelAnimationFrame(pitchRafId);
-    pitchRafId = requestAnimationFrame(pitchDetectLoop);
+    requestAnimationFrame(pitchDetectLoop);
     setStatus("Pitch highlight enabled");
   }
 
@@ -2791,10 +2551,6 @@ function hitNote(mx,my){
     pitchStream = null;
     pitchAnalyser = null;
     pitchBuf = null;
-    if (pitchRafId){
-      cancelAnimationFrame(pitchRafId);
-      pitchRafId = null;
-    }
   }
 
   function freqToMidi(freq){
@@ -2856,13 +2612,10 @@ function hitNote(mx,my){
 
   function pitchDetectLoop(){
     if (!pitchMode || !pitchAnalyser || !pitchBuf) return;
-    if (document.hidden){
-      pitchRafId = null;
-      return;
-    }
 
     pitchAnalyser.getFloatTimeDomainData(pitchBuf);
-    const freq = autoCorrelatePitch(pitchBuf, pitchSampleRate);
+    const ctx = getSharedAudioContext();
+    const freq = autoCorrelatePitch(pitchBuf, ctx.sampleRate);
 
     if (freq > 0){
       const midi = freqToMidi(freq);
@@ -2899,7 +2652,7 @@ function hitNote(mx,my){
       pitchPrevRenderMidi = pitchHighlightedMidi;
       renderAll();
     }
-    pitchRafId = requestAnimationFrame(pitchDetectLoop);
+    requestAnimationFrame(pitchDetectLoop);
   }
 
 
@@ -2913,7 +2666,7 @@ function hitNote(mx,my){
     isPlaying = true;
     posMelody.classList.add("playing");
     posChords.classList.add("playing");
-    if (!document.hidden) rafId = requestAnimationFrame(tickUI);
+    rafId = requestAnimationFrame(tickUI);
     setStatus("Playing");
   });
 
@@ -2928,27 +2681,6 @@ function hitNote(mx,my){
     rafId = null;
     renderAll();
     setStatus("Stopped");
-  });
-
-  document.addEventListener("visibilitychange", ()=>{
-    if (document.hidden){
-      if (rafId){
-        cancelAnimationFrame(rafId);
-        rafId = null;
-      }
-      if (pitchRafId){
-        cancelAnimationFrame(pitchRafId);
-        pitchRafId = null;
-      }
-      return;
-    }
-
-    if (isPlaying && !rafId){
-      rafId = requestAnimationFrame(tickUI);
-    }
-    if (pitchMode && pitchAnalyser && pitchBuf && !pitchRafId){
-      pitchRafId = requestAnimationFrame(pitchDetectLoop);
-    }
   });
 
   // Spacebar: toggle Play/Stop (ignore when typing in inputs)
@@ -3029,8 +2761,7 @@ renderAll();
 
   function followScrollToX(x){
     if (!ui.follow) return;
-    const maxScroll = Math.max(0, melodyCanvas.width - melodyScroll.clientWidth);
-    const target = clamp(x - melodyScroll.clientWidth*0.35, 0, maxScroll);
+    const target = clamp(x - melodyScroll.clientWidth*0.35, 0, melodyCanvas.width);
     syncingScroll = true;
     try{
       melodyScroll.scrollLeft = target;
@@ -3045,7 +2776,7 @@ renderAll();
   function tickUI(ts){
     const nowTs = ts ?? performance.now();
     if (nowTs - lastUiTs < 33){
-      if (isPlaying && !document.hidden) rafId = requestAnimationFrame(tickUI);
+      if (isPlaying) rafId = requestAnimationFrame(tickUI);
       return;
     }
     lastUiTs = nowTs;
@@ -3059,8 +2790,8 @@ renderAll();
 
     if (ui.follow) followScrollToX(stepToX(s));
 
-    drawDynamicOverlayOnly();
-    if (isPlaying && !document.hidden) rafId = requestAnimationFrame(tickUI);
+    renderAll();
+    if (isPlaying) rafId = requestAnimationFrame(tickUI);
   }
 
   // ======== AUDIO BUILD ========
@@ -3418,7 +3149,6 @@ function isTransportPlaying() {
   let acc = 0;
   let last = performance.now();
   let prevMode = 'idle';
-  let mascotRafId = null;
 
   // Animation speed:
   // at 120 BPM -> about 6 fps (slower than before), and scales with tempo.
@@ -3468,28 +3198,10 @@ function isTransportPlaying() {
       ctx.drawImage(img, fx, 0, frameW, frameH, 0, 0, 128, 128);
     }
 
-    mascotRafId = requestAnimationFrame(tick);
+    requestAnimationFrame(tick);
   }
 
-  function startMascotLoop(){
-    if (mascotRafId != null) return;
-    if (document.hidden) return;
-    last = performance.now();
-    mascotRafId = requestAnimationFrame(tick);
-  }
-
-  function stopMascotLoop(){
-    if (mascotRafId == null) return;
-    cancelAnimationFrame(mascotRafId);
-    mascotRafId = null;
-  }
-
-  document.addEventListener("visibilitychange", ()=>{
-    if (document.hidden) stopMascotLoop();
-    else startMascotLoop();
-  });
-
-  startMascotLoop();
+  requestAnimationFrame(tick);
 })();
 </script>
 
@@ -3497,8 +3209,6 @@ function isTransportPlaying() {
 </html>
 <script>
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js").then((reg)=>{
-    try{ reg.update(); }catch(_){}
-  });
+  navigator.serviceWorker.register("sw.js");
 }
 </script>
