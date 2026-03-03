@@ -505,6 +505,7 @@
   let rafId = null;
   let lastUiTs = 0;
   let pitchRafId = null;
+  let lastFollowTargetX = null;
 
   // ===== scroll usability flags =====
   let syncingScroll = false;
@@ -686,9 +687,9 @@
     compactNotesIfNeeded();
     const stepDurSec = Math.max(0.02, Tone.Time("16n").toSeconds());
     const now = Tone.now();
-    // If callback is too late (main-thread hiccup / background throttling),
-    // skip this step instead of bunching many notes at "now".
-    if (time < (now - stepDurSec * 0.75)){
+    // If callback is late, skip this step instead of sounding audibly behind the grid.
+    const lateLimitSec = Math.max(0.012, stepDurSec * 0.35);
+    if (time < (now - lateLimitSec)){
       __stepCursor = (__stepCursor + 1) % TOTAL_STEPS;
       return;
     }
@@ -889,6 +890,13 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
       pitchDecay:0.01, octaves:4,
       envelope:{attack:0.001, decay:0.16, sustain:0, release:0.05}
     });
+
+    // Keep enough headroom to avoid drum bus breakup under dense playback.
+    kick.volume.value = -4;
+    snare.volume.value = -11;
+    hat.volume.value = -18;
+    crash.volume.value = -16;
+    tom.volume.value = -9;
 
     kick.chain(limiter, Tone.Destination);
     snare.chain(reverb, limiter, Tone.Destination);
@@ -1725,6 +1733,7 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     prevPlayheadXMelody = null;
     prevPlayheadXChord = null;
     playheadFastFrame = 0;
+    lastFollowTargetX = null;
     drawDynamicOverlayOnly();
   }
 
@@ -3051,7 +3060,11 @@ renderAll();
 
   function followScrollToX(x){
     if (!ui.follow) return;
-    const target = clamp(x - melodyScroll.clientWidth*0.35, 0, melodyCanvas.width);
+    if (userScrollActive) return;
+    const maxScroll = Math.max(0, melodyCanvas.width - melodyScroll.clientWidth);
+    const target = clamp(x - melodyScroll.clientWidth*0.35, 0, maxScroll);
+    if (lastFollowTargetX != null && Math.abs(target - lastFollowTargetX) < 2) return;
+    lastFollowTargetX = target;
     syncingScroll = true;
     try{
       melodyScroll.scrollLeft = target;
