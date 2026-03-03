@@ -1502,25 +1502,23 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
   function drawPlayheadsOnlyFast(){
     const x = Math.round(isPlaying ? stepToX(playStepFloat % TOTAL_STEPS) : stepToX(stepCursor)) + 0.5;
     playheadFastFrame++;
-    if ((playheadFastFrame % 120) === 0){
-      drawDynamicOverlayOnly();
-      prevPlayheadXRuler = x;
-      prevPlayheadXMelody = x;
-      prevPlayheadXChord = x;
-      return;
-    }
 
-    if (prevPlayheadXRuler != null) restoreStripe(rctx, rulerStaticCanvas, prevPlayheadXRuler, rulerCanvas.height);
+    // Restore only the visible viewport area from static layers each frame.
+    // This avoids playhead trails while keeping cost much lower than full-canvas redraw.
+    const rvx = Math.max(0, Math.floor(rulerScroll.scrollLeft) - 32);
+    const rvw = Math.min(rulerCanvas.width - rvx, Math.ceil(rulerScroll.clientWidth) + 64);
+    if (rvw > 0) rctx.drawImage(rulerStaticCanvas, rvx, 0, rvw, rulerCanvas.height, rvx, 0, rvw, rulerCanvas.height);
     drawPlayheadLine(rctx, x, rulerCanvas.height);
-    prevPlayheadXRuler = x;
 
-    if (prevPlayheadXMelody != null) restoreStripe(mctx, melodyStaticCanvas, prevPlayheadXMelody, melodyCanvas.height);
+    const mvx = Math.max(0, Math.floor(melodyScroll.scrollLeft) - 32);
+    const mvw = Math.min(melodyCanvas.width - mvx, Math.ceil(melodyScroll.clientWidth) + 64);
+    if (mvw > 0) mctx.drawImage(melodyStaticCanvas, mvx, 0, mvw, melodyCanvas.height, mvx, 0, mvw, melodyCanvas.height);
     drawPlayheadLine(mctx, x, melodyCanvas.height);
-    prevPlayheadXMelody = x;
 
-    if (prevPlayheadXChord != null) restoreStripe(cctx, chordStaticCanvas, prevPlayheadXChord, chordCanvas.height);
+    const cvx = Math.max(0, Math.floor(chordScroll.scrollLeft) - 32);
+    const cvw = Math.min(chordCanvas.width - cvx, Math.ceil(chordScroll.clientWidth) + 64);
+    if (cvw > 0) cctx.drawImage(chordStaticCanvas, cvx, 0, cvw, chordCanvas.height, cvx, 0, cvw, chordCanvas.height);
     drawPlayheadLine(cctx, x, chordCanvas.height);
-    prevPlayheadXChord = x;
   }
 
   function renderPitchSidebar(){
