@@ -276,6 +276,7 @@
       </label>
 
       <button id="btnRetune" class="btn">🧲 Retune to Scale</button>
+      <button id="btnRandomizeSelectedPitch" class="btn">🎲 Randomize Sel Pitch</button>
       <button id="btnAutoRetune" class="btn">🪄 AutoRetune: ON</button>
 
       <div class="sep"></div>
@@ -440,6 +441,7 @@
   const pitchLowOct = document.getElementById("pitchLowOct");
   const pitchHighOct = document.getElementById("pitchHighOct");
   const btnRetune = document.getElementById("btnRetune");
+  const btnRandomizeSelectedPitch = document.getElementById("btnRandomizeSelectedPitch");
   const btnAutoRetune = document.getElementById("btnAutoRetune");
 
   let TOTAL_BARS = 16;
@@ -1314,6 +1316,65 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     rebuildAudio();
     renderAll();
     setStatus("Retuned to scale");
+  }
+
+  function allowedPitchClassesAtStep(step, scalePCs){
+    const out = new Set(scalePCs);
+    const c = chordAtStep(step);
+    if (c){
+      const info = parseChord(c.chord);
+      if (info){
+        for (const pc of info.tones) out.add(pc);
+      }
+    }
+    return out;
+  }
+
+  function randomMidiFromAllowed(allowedPCs, currentMidi){
+    const cands = [];
+    for (let m = midiMinLimit; m <= midiMaxLimit; m++){
+      const pc = ((m % 12) + 12) % 12;
+      if (allowedPCs.has(pc)) cands.push(m);
+    }
+    if (!cands.length) return currentMidi;
+    if (cands.length === 1) return cands[0];
+
+    let pick = currentMidi;
+    for (let tries = 0; tries < 8 && pick === currentMidi; tries++){
+      pick = cands[Math.floor(Math.random() * cands.length)];
+    }
+    if (pick === currentMidi){
+      for (const m of cands){
+        if (m !== currentMidi){
+          pick = m;
+          break;
+        }
+      }
+    }
+    return clamp(pick, midiMinLimit, midiMaxLimit);
+  }
+
+  function randomizeSelectedNotesPitch(){
+    if (!mel || !mel.sel || !mel.sel.set || mel.sel.set.size === 0){
+      setStatus("Select notes first");
+      return;
+    }
+
+    pushUndo("Randomize selected pitch");
+    const scalePCs = getSelectedScalePCs();
+    let changed = 0;
+    for (const n of mel.sel.set){
+      const allowed = allowedPitchClassesAtStep(n.step, scalePCs);
+      const nextMidi = randomMidiFromAllowed(allowed, n.midi);
+      if (nextMidi !== n.midi){
+        n.midi = nextMidi;
+        changed++;
+      }
+    }
+
+    rebuildAudio();
+    renderAll();
+    setStatus(changed > 0 ? `Randomized ${changed} selected notes` : "Selected notes unchanged");
   }
 
   // ======== UNDO/REDO ========
@@ -2435,6 +2496,7 @@ function hitNote(mx,my){
     setStatus("AutoRetune toggled");
   });
   btnRetune.addEventListener("click", retuneAllNotesToScale);
+  btnRandomizeSelectedPitch.addEventListener("click", randomizeSelectedNotesPitch);
 
   tempo.addEventListener("input", ()=>{
     tempoLabel.textContent = tempo.value;
