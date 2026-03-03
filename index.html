@@ -396,6 +396,7 @@
   let prevPlayheadXRuler = null;
   let prevPlayheadXMelody = null;
   let prevPlayheadXChord = null;
+  let playheadFastFrame = 0;
 
   const melodyScroll = document.getElementById("melodyScroll");
   const rulerScroll  = document.getElementById("rulerScroll");
@@ -1465,7 +1466,7 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     rctx.clearRect(0,0,rulerCanvas.width,rulerCanvas.height);
     rctx.drawImage(rulerStaticCanvas, 0, 0);
     const h = rulerCanvas.height;
-    const x = isPlaying ? stepToX(playStepFloat % TOTAL_STEPS) : stepToX(stepCursor);
+    const x = Math.round(isPlaying ? stepToX(playStepFloat % TOTAL_STEPS) : stepToX(stepCursor)) + 0.5;
     rctx.strokeStyle = isPlaying ? "rgba(56,189,248,0.95)" : "rgba(255,255,255,0.72)";
     rctx.lineWidth = 2;
     rctx.setLineDash(isPlaying ? [] : [8,6]);
@@ -1474,7 +1475,7 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
   }
 
   function restoreStripe(ctx, srcCanvas, x, h){
-    const pad = 6;
+    const pad = 14;
     const sx = Math.max(0, Math.floor(x - pad));
     const sw = Math.min(srcCanvas.width - sx, pad * 2 + 1);
     if (sw <= 0) return;
@@ -1499,7 +1500,15 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
   }
 
   function drawPlayheadsOnlyFast(){
-    const x = isPlaying ? stepToX(playStepFloat % TOTAL_STEPS) : stepToX(stepCursor);
+    const x = Math.round(isPlaying ? stepToX(playStepFloat % TOTAL_STEPS) : stepToX(stepCursor)) + 0.5;
+    playheadFastFrame++;
+    if ((playheadFastFrame % 120) === 0){
+      drawDynamicOverlayOnly();
+      prevPlayheadXRuler = x;
+      prevPlayheadXMelody = x;
+      prevPlayheadXChord = x;
+      return;
+    }
 
     if (prevPlayheadXRuler != null) restoreStripe(rctx, rulerStaticCanvas, prevPlayheadXRuler, rulerCanvas.height);
     drawPlayheadLine(rctx, x, rulerCanvas.height);
@@ -1717,6 +1726,7 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     prevPlayheadXRuler = null;
     prevPlayheadXMelody = null;
     prevPlayheadXChord = null;
+    playheadFastFrame = 0;
     drawDynamicOverlayOnly();
   }
 
@@ -1918,9 +1928,13 @@ function hitNote(mx,my){
       return;
     }
 
+    if (mel.drag.mode === "pan"){
+      // Pan completion is centralized in window mouseup handler.
+      return;
+    }
+
     const {mx,my} = canvasMousePos(melodyCanvas, e);
     const dxSteps = quant(xToStep(mx) - xToStep(mel.drag.startX));
-    const dyMidi = yToMidi(my) - mel.drag.orig.midi;
 
     if (mel.drag.mode === "move"){
       pushUndo("Move note");
@@ -1929,6 +1943,7 @@ function hitNote(mx,my){
         mel.drag.mode = null; mel.drag.ghost = null;
         return;
       }
+      const dyMidi = yToMidi(my) - mel.drag.orig.midi;
       n.step = clamp(quant(mel.drag.orig.step + dxSteps), 0, TOTAL_STEPS-1);
       n.midi = clamp(mel.drag.orig.midi + dyMidi, midiMinLimit, midiMaxLimit);
       if (n.step + n.dur > TOTAL_STEPS) n.dur = Math.max(1, TOTAL_STEPS - n.step);
@@ -1952,11 +1967,16 @@ function hitNote(mx,my){
 
     if (mel.drag.mode === "moveSelection"){
       pushUndo("Move selection");
+      if (!mel.drag.orig || !Number.isFinite(mel.drag.orig.midi)){
+        mel.drag.mode = null; mel.drag.ghost = null;
+        return;
+      }
       const selected = Array.from(mel.sel.set);
       if (selected.length){
         const dx = dxSteps;
         const dy = yToMidi(my) - mel.drag.orig.midi;
         for (const n of selected){
+          if (!isValidNoteObj(n)) continue;
           n.step = clamp(quant(n.step + dx), 0, TOTAL_STEPS-1);
           n.midi = clamp(n.midi + dy, midiMinLimit, midiMaxLimit);
           if (n.step + n.dur > TOTAL_STEPS) n.dur = Math.max(1, TOTAL_STEPS - n.step);
