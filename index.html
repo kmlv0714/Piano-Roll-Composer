@@ -462,6 +462,16 @@
 
         <div class="tabPanel" data-tab-panel="random">
           <button id="btnRandomizeSelectedPitch" class="btn">Randomize Sel Pitch</button>
+          <label class="pill">Rhythm
+            <select id="randRhythmTemplate">
+              <option value="auto" selected>Auto</option>
+              <option value="straight8">Straight 8th</option>
+              <option value="straight16">Straight 16th</option>
+              <option value="syncopated_a">Syncopated A</option>
+              <option value="syncopated_b">Syncopated B</option>
+              <option value="sparse">Sparse</option>
+            </select>
+          </label>
           <label class="pill">Rand Pos
             <select id="randPosMode">
               <option value="selection" selected>Selection</option>
@@ -477,6 +487,10 @@
             <input id="randDensity" type="range" min="2" max="16" value="8" style="width:110px">
             <span id="randDensityLabel">8</span>
           </label>
+          <label class="pill">Pitch Span
+            <input id="randPitchSpan" type="range" min="6" max="48" value="24" style="width:110px">
+            <span id="randPitchSpanLabel">24 st</span>
+          </label>
           <label class="pill">Intvl Near
             <input id="randIntNear" type="range" min="0" max="10" value="6" style="width:90px">
             <span id="randIntNearLabel">6</span>
@@ -489,7 +503,31 @@
             <input id="randIntFar" type="range" min="0" max="10" value="1" style="width:90px">
             <span id="randIntFarLabel">1</span>
           </label>
-          <button id="btnRandomizeStructure" class="btn">Randomize Notes</button>
+          <label class="pill">Chord W
+            <input id="randWChordTone" type="range" min="0" max="10" value="7" style="width:90px">
+            <span id="randWChordToneLabel">7</span>
+          </label>
+          <label class="pill">Step W
+            <input id="randWStepwise" type="range" min="0" max="10" value="7" style="width:90px">
+            <span id="randWStepwiseLabel">7</span>
+          </label>
+          <label class="pill">Leap Back W
+            <input id="randWLeapRecover" type="range" min="0" max="10" value="6" style="width:90px">
+            <span id="randWLeapRecoverLabel">6</span>
+          </label>
+          <label class="pill">Center W
+            <input id="randWCenterPull" type="range" min="0" max="10" value="5" style="width:90px">
+            <span id="randWCenterPullLabel">5</span>
+          </label>
+          <label class="pill">Repeat W
+            <input id="randWRepeat" type="range" min="0" max="10" value="6" style="width:90px">
+            <span id="randWRepeatLabel">6</span>
+          </label>
+          <label class="pill">End W
+            <input id="randWEndStable" type="range" min="0" max="10" value="8" style="width:90px">
+            <span id="randWEndStableLabel">8</span>
+          </label>
+          <button id="btnRandomizeStructure" class="btn">Generate Phrase</button>
         </div>
 
         <div class="tabPanel" data-tab-panel="edit">
@@ -732,12 +770,27 @@
   const randBarsSpanLabel = document.getElementById("randBarsSpanLabel");
   const randDensity = document.getElementById("randDensity");
   const randDensityLabel = document.getElementById("randDensityLabel");
+  const randPitchSpan = document.getElementById("randPitchSpan");
+  const randPitchSpanLabel = document.getElementById("randPitchSpanLabel");
   const randIntNear = document.getElementById("randIntNear");
   const randIntNearLabel = document.getElementById("randIntNearLabel");
   const randIntMid = document.getElementById("randIntMid");
   const randIntMidLabel = document.getElementById("randIntMidLabel");
   const randIntFar = document.getElementById("randIntFar");
   const randIntFarLabel = document.getElementById("randIntFarLabel");
+  const randRhythmTemplate = document.getElementById("randRhythmTemplate");
+  const randWChordTone = document.getElementById("randWChordTone");
+  const randWChordToneLabel = document.getElementById("randWChordToneLabel");
+  const randWStepwise = document.getElementById("randWStepwise");
+  const randWStepwiseLabel = document.getElementById("randWStepwiseLabel");
+  const randWLeapRecover = document.getElementById("randWLeapRecover");
+  const randWLeapRecoverLabel = document.getElementById("randWLeapRecoverLabel");
+  const randWCenterPull = document.getElementById("randWCenterPull");
+  const randWCenterPullLabel = document.getElementById("randWCenterPullLabel");
+  const randWRepeat = document.getElementById("randWRepeat");
+  const randWRepeatLabel = document.getElementById("randWRepeatLabel");
+  const randWEndStable = document.getElementById("randWEndStable");
+  const randWEndStableLabel = document.getElementById("randWEndStableLabel");
   const btnRandomizeStructure = document.getElementById("btnRandomizeStructure");
   const btnAutoRetune = document.getElementById("btnAutoRetune");
 
@@ -1974,38 +2027,281 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     return { mode: "song", start: 0, end: TOTAL_STEPS, selectedNotes: [], seedCount: 0 };
   }
 
-  function randomDuration(step, end, snap){
-    const pool = [snap, snap*2, snap*4, snap*8];
-    const avail = pool.filter(d => d > 0 && step + d <= end + 1e-9);
-    if (!avail.length) return Math.min(snap, end - step);
-    return avail[Math.floor(Math.random() * avail.length)];
+  const RHYTHM_TEMPLATES = {
+    straight8: [
+      { step:0, dur:2 }, { step:2, dur:2 }, { step:4, dur:2 }, { step:6, dur:2 },
+      { step:8, dur:2 }, { step:10, dur:2 }, { step:12, dur:2 }, { step:14, dur:2 }
+    ],
+    straight16: [
+      { step:0, dur:1 }, { step:1, dur:1 }, { step:2, dur:1 }, { step:3, dur:1 },
+      { step:4, dur:1 }, { step:5, dur:1 }, { step:6, dur:1 }, { step:7, dur:1 },
+      { step:8, dur:1 }, { step:9, dur:1 }, { step:10, dur:1 }, { step:11, dur:1 },
+      { step:12, dur:1 }, { step:13, dur:1 }, { step:14, dur:1 }, { step:15, dur:1 }
+    ],
+    syncopated_a: [
+      { step:0, dur:2 }, { step:3, dur:1 }, { step:4, dur:2 }, { step:7, dur:1 },
+      { step:8, dur:2 }, { step:11, dur:1 }, { step:12, dur:2 }, { step:15, dur:1 }
+    ],
+    syncopated_b: [
+      { step:0, dur:3 }, { step:4, dur:1 }, { step:6, dur:2 }, { step:9, dur:1 },
+      { step:10, dur:2 }, { step:13, dur:1 }, { step:14, dur:2 }
+    ],
+    sparse: [
+      { step:0, dur:4 }, { step:4, dur:2 }, { step:8, dur:4 }, { step:14, dur:2 }
+    ]
+  };
+
+  function getPhraseRuleWeights(){
+    return {
+      chordTone: clamp(Number(randWChordTone?.value || 7), 0, 10),
+      stepwise: clamp(Number(randWStepwise?.value || 7), 0, 10),
+      leapRecover: clamp(Number(randWLeapRecover?.value || 6), 0, 10),
+      centerPull: clamp(Number(randWCenterPull?.value || 5), 0, 10),
+      repeat: clamp(Number(randWRepeat?.value || 6), 0, 10),
+      endStable: clamp(Number(randWEndStable?.value || 8), 0, 10)
+    };
   }
 
-  function overlapsAnyNote(step, dur, list){
-    const end = step + dur;
-    for (const n of list){
-      const nEnd = n.step + n.dur;
-      if (!(nEnd <= step || n.step >= end)) return true;
+  function getPhrasePitchSpanSemitones(){
+    return clamp(Number(randPitchSpan?.value || 24), 6, 48);
+  }
+
+  function chooseRhythmTemplateId(density){
+    const v = String(randRhythmTemplate?.value || "auto");
+    if (v !== "auto" && RHYTHM_TEMPLATES[v]) return v;
+    if (density >= 13) return "straight16";
+    if (density >= 9) return "straight8";
+    if (density >= 6) return Math.random() < 0.5 ? "syncopated_a" : "syncopated_b";
+    return "sparse";
+  }
+
+  function buildRhythmEventsFromTemplate(cfg, snap){
+    const density = clamp(Number(randDensity?.value || 8), 2, 16);
+    const templateId = chooseRhythmTemplateId(density);
+    const base = RHYTHM_TEMPLATES[templateId] || RHYTHM_TEMPLATES.straight8;
+    const keepProb = clamp(density / 16, 0.12, 1);
+    const byStep = new Map();
+    const barStartIndex = Math.floor(cfg.start / STEPS_PER_BAR);
+    const barEndIndex = Math.ceil(cfg.end / STEPS_PER_BAR);
+
+    for (let bar = barStartIndex; bar < barEndIndex; bar++){
+      const barBase = bar * STEPS_PER_BAR;
+      const barEvents = [];
+      for (const ev of base){
+        const rawStep = barBase + ev.step;
+        if (rawStep < cfg.start || rawStep >= cfg.end) continue;
+        const mustKeep = (ev.step === 0);
+        if (!mustKeep && Math.random() > keepProb) continue;
+        barEvents.push({ step: rawStep, dur: ev.dur });
+      }
+      if (!barEvents.length){
+        const fallbackStep = barBase + base[0].step;
+        if (fallbackStep >= cfg.start && fallbackStep < cfg.end){
+          barEvents.push({ step: fallbackStep, dur: base[0].dur });
+        }
+      }
+      for (const ev of barEvents){
+        const step = clamp(Math.round(ev.step / snap) * snap, cfg.start, cfg.end - snap);
+        const dur = clamp(Math.round(ev.dur / snap) * snap, snap, Math.max(snap, cfg.end - step));
+        const k = step.toFixed(3);
+        const prev = byStep.get(k);
+        if (!prev || dur > prev.dur){
+          byStep.set(k, { step, dur });
+        }
+      }
     }
-    return false;
+
+    const events = Array.from(byStep.values()).sort((a,b)=>a.step-b.step);
+    if (!events.length){
+      return { templateId, events:[{ step:cfg.start, dur:snap }] };
+    }
+    for (let i = 0; i < events.length; i++){
+      const nextStep = (i + 1 < events.length) ? events[i+1].step : cfg.end;
+      events[i].dur = clamp(Math.min(events[i].dur, nextStep - events[i].step), snap, Math.max(snap, cfg.end - events[i].step));
+    }
+    return { templateId, events };
+  }
+
+  function getChordToneSetAtStep(step){
+    const out = new Set();
+    const c = chordAtStep(step);
+    if (!c) return out;
+    const info = parseChord(c.chord);
+    if (!info) return out;
+    for (const pc of info.tones) out.add(pc);
+    return out;
+  }
+
+  function getStableEndPitchClasses(step, scalePCs){
+    const c = chordAtStep(step);
+    if (c){
+      const info = parseChord(c.chord);
+      if (info){
+        let triad = [0,4,7];
+        switch (info.quality){
+          case "m":
+          case "m7":
+            triad = [0,3,7];
+            break;
+          case "sus4":
+            triad = [0,5,7];
+            break;
+          case "dim":
+          case "m7b5":
+            triad = [0,3,6];
+            break;
+          case "aug":
+            triad = [0,4,8];
+            break;
+          case "5":
+            triad = [0,7];
+            break;
+        }
+        const pcs = new Set();
+        for (const iv of triad){
+          const pc = (info.rootPc + iv) % 12;
+          if (scalePCs.has(pc)) pcs.add(pc);
+        }
+        if (pcs.size) return pcs;
+      }
+    }
+    const rootPc = ROOT_PC[scaleRoot.value] ?? 0;
+    const pat = SCALE_PATTERNS[scaleType.value] ?? SCALE_PATTERNS.major;
+    const i3 = Math.min(2, pat.length - 1);
+    const i5 = Math.min(4, pat.length - 1);
+    return new Set([
+      (rootPc + pat[0]) % 12,
+      (rootPc + pat[i3]) % 12,
+      (rootPc + pat[i5]) % 12
+    ]);
+  }
+
+  function weightedPick(items, weightFn){
+    if (!items.length) return null;
+    let total = 0;
+    const ws = new Array(items.length);
+    for (let i = 0; i < items.length; i++){
+      let w = Number(weightFn(items[i], i));
+      if (!Number.isFinite(w) || w <= 0) w = 0.0001;
+      ws[i] = w;
+      total += w;
+    }
+    let r = Math.random() * total;
+    for (let i = 0; i < items.length; i++){
+      r -= ws[i];
+      if (r <= 0) return items[i];
+    }
+    return items[items.length - 1];
+  }
+
+  function estimatePhraseCenterMidi(cfg, scalePCs){
+    const src = (cfg.selectedNotes && cfg.selectedNotes.length)
+      ? cfg.selectedNotes
+      : notes.filter(n => n.step < cfg.start).sort((a,b)=>a.step-b.step).slice(-8);
+    if (src.length){
+      const avg = src.reduce((s,n)=>s+n.midi,0) / src.length;
+      return clamp(Math.round(avg), midiMinLimit, midiMaxLimit);
+    }
+    const mid = clamp(Math.round((midiMinLimit + midiMaxLimit) * 0.5), midiMinLimit, midiMaxLimit);
+    return clamp(nearestMidiInScale(mid, scalePCs), midiMinLimit, midiMaxLimit);
+  }
+
+  function chooseMidiByPhraseRules(step, prevMidi, centerMidi, scalePCs, leapState, repeatTargetMidi, isLast, weights, rangeMinMidi, rangeMaxMidi){
+    const candsAll = candidateMidisFromAllowed(scalePCs);
+    const cands = candsAll.filter(m => m >= rangeMinMidi && m <= rangeMaxMidi);
+    const pool = cands.length ? cands : candsAll;
+    if (!pool.length) return clamp(centerMidi || 60, midiMinLimit, midiMaxLimit);
+    const intW = getIntervalWeights();
+    const chordTonePCs = getChordToneSetAtStep(step);
+    const stableEndPCs = isLast ? getStableEndPitchClasses(step, scalePCs) : null;
+    return weightedPick(pool, (m)=>{
+      const pc = ((m % 12) + 12) % 12;
+      let score = 0.01;
+
+      if (chordTonePCs.has(pc)) score += 1 + weights.chordTone;
+      else score += 0.35;
+
+      const centerDist = Math.abs(m - centerMidi);
+      score += weights.centerPull * Math.max(0, 1 - (centerDist / 18));
+
+      if (Number.isFinite(prevMidi)){
+        const d = Math.abs(m - prevMidi);
+        const moveW = (d <= 2) ? intW.near : (d <= 7 ? intW.mid : intW.far);
+        score += (weights.stepwise + 0.2) * (0.15 + (moveW / 10));
+        if (d >= 12) score *= 0.5;
+
+        if (leapState.dir !== 0 && leapState.size >= 7){
+          const dir = Math.sign(m - prevMidi);
+          if (dir === -leapState.dir){
+            score += weights.leapRecover * (d <= 7 ? 1.6 : 0.8);
+          }else if (dir === leapState.dir && d >= 5){
+            score *= Math.max(0.2, 1 - (weights.leapRecover * 0.08));
+          }
+        }
+      }else{
+        score += 1.0;
+      }
+
+      if (Number.isFinite(repeatTargetMidi)){
+        const dRepeat = Math.abs(m - repeatTargetMidi);
+        score += weights.repeat * 1.8 * Math.max(0, 1 - (dRepeat / 8));
+      }
+
+      if (isLast && stableEndPCs){
+        if (stableEndPCs.has(pc)){
+          score += 1 + (weights.endStable * 2.5);
+        }else{
+          score *= Math.max(0.1, 1 - (weights.endStable * 0.08));
+        }
+      }
+      return score;
+    });
+  }
+
+  function mutateRepeatedMidi(midi, scalePCs, rangeMinMidi, rangeMaxMidi){
+    const candsAll = candidateMidisFromAllowed(scalePCs);
+    const cands = candsAll.filter(m => m >= rangeMinMidi && m <= rangeMaxMidi);
+    const pool = cands.length ? cands : candsAll;
+    if (!pool.length || !Number.isFinite(midi)) return midi;
+    const deltas = [-4, -3, -2, -1, 1, 2, 3, 4];
+    for (let i = 0; i < 6; i++){
+      const d = deltas[randInt(0, deltas.length - 1)];
+      const raw = clamp(nearestMidiInScale(midi + d, scalePCs), midiMinLimit, midiMaxLimit);
+      const m = clamp(raw, rangeMinMidi, rangeMaxMidi);
+      if (m !== midi) return m;
+    }
+    for (const m of pool){
+      if (m !== midi) return m;
+    }
+    return midi;
+  }
+
+  function lockLastNoteToStableTone(created, scalePCs, centerMidi, rangeMinMidi, rangeMaxMidi){
+    if (!created.length) return;
+    const last = created[created.length - 1];
+    const stablePCs = getStableEndPitchClasses(last.step, scalePCs);
+    if (!stablePCs || !stablePCs.size) return;
+    const stableAll = candidateMidisFromAllowed(stablePCs);
+    const stableMidis = stableAll.filter(m => m >= rangeMinMidi && m <= rangeMaxMidi);
+    const pool = stableMidis.length ? stableMidis : stableAll;
+    if (!pool.length) return;
+    let best = pool[0];
+    let bestScore = Infinity;
+    for (const m of pool){
+      const dist = Math.abs(m - last.midi) + (Math.abs(m - centerMidi) * 0.25);
+      if (dist < bestScore){
+        bestScore = dist;
+        best = m;
+      }
+    }
+    last.midi = best;
   }
 
   function randomizeNotesStructure(){
     const cfg = getRandomizeRangeConfig();
     if (!cfg) return;
-
     const snap = snapSteps();
-    const rangeSteps = Math.max(snap, cfg.end - cfg.start);
-    const slots = Math.max(1, Math.floor(rangeSteps / snap));
-    const density = clamp(Number(randDensity?.value || 8), 2, 16);
-    const center = cfg.seedCount > 0
-      ? Math.max(1, cfg.seedCount * (density / 8))
-      : Math.max(1, slots * (density / 16));
-    const minCount = Math.max(1, Math.floor(center * 0.6));
-    const maxCount = Math.max(minCount, Math.ceil(center * 1.4));
-    const count = clamp(randInt(minCount, maxCount), 1, Math.max(1, slots * 2));
-
-    pushUndo("Randomize notes structure");
+    pushUndo("Generate phrase");
 
     if (cfg.mode === "selection" && cfg.selectedNotes.length){
       const del = new Set(cfg.selectedNotes);
@@ -2015,33 +2311,76 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     }
 
     const scalePCs = getSelectedScalePCs();
-    const created = [];
+    const weights = getPhraseRuleWeights();
+    const { templateId, events } = buildRhythmEventsFromTemplate(cfg, snap);
+    const created = events.map(ev => ({
+      step: ev.step,
+      dur: ev.dur,
+      midi: clamp(60, midiMinLimit, midiMaxLimit),
+      vel: 1.0
+    }));
+
     let prevMidi = null;
     const prev = notes
       .filter(n => n.step < cfg.start)
       .sort((a,b)=> (a.step - b.step) || (a.midi - b.midi));
     if (prev.length) prevMidi = prev[prev.length-1].midi;
-
-    const maxAttempts = Math.max(count * 20, slots * 12);
-    let attempts = 0;
-    while (created.length < count && attempts < maxAttempts){
-      attempts++;
-      const slot = randInt(0, slots - 1);
-      const step = clamp(cfg.start + slot * snap, cfg.start, cfg.end - snap);
-      const dur = clamp(randomDuration(step, cfg.end, snap), snap, cfg.end - step);
-      if (overlapsAnyNote(step, dur, notes)) continue;
-      const n = { step, dur, midi: clamp(60, midiMinLimit, midiMaxLimit), vel: 1.0 };
-      notes.push(n);
-      created.push(n);
+    const centerMidi = estimatePhraseCenterMidi(cfg, scalePCs);
+    const pitchSpan = getPhrasePitchSpanSemitones();
+    const halfSpan = Math.max(1, Math.floor(pitchSpan / 2));
+    let rangeMinMidi = clamp(centerMidi - halfSpan, midiMinLimit, midiMaxLimit);
+    let rangeMaxMidi = clamp(centerMidi + halfSpan, midiMinLimit, midiMaxLimit);
+    if (rangeMaxMidi - rangeMinMidi < 2){
+      rangeMinMidi = Math.max(midiMinLimit, rangeMinMidi - 2);
+      rangeMaxMidi = Math.min(midiMaxLimit, rangeMaxMidi + 2);
     }
+    const motifSpan = Math.max(snap, Math.min(STEPS_PER_BAR, cfg.end - cfg.start));
+    const motifMap = new Map();
+    const leapState = { dir: 0, size: 0 };
 
     created.sort((a,b)=> (a.step - b.step) || (a.dur - b.dur));
-    for (const n of created){
-      const allowed = allowedPitchClassesAtStep(n.step, scalePCs);
-      n.midi = weightedMidiFromAllowed(allowed, prevMidi);
+    for (let i = 0; i < created.length; i++){
+      const n = created[i];
+      const relStep = n.step - cfg.start;
+      const relInMotif = ((relStep % motifSpan) + motifSpan) % motifSpan;
+      const motifKey = (Math.round(relInMotif / snap) * snap).toFixed(3);
+      const canRepeat = relStep >= motifSpan && motifMap.has(motifKey);
+      const repeatProb = weights.repeat / 10;
+      const repeatTargetMidi = (canRepeat && Math.random() < repeatProb) ? motifMap.get(motifKey) : null;
+      const prevBefore = prevMidi;
+      const isLast = (i === created.length - 1);
+      n.midi = chooseMidiByPhraseRules(
+        n.step,
+        prevBefore,
+        centerMidi,
+        scalePCs,
+        leapState,
+        repeatTargetMidi,
+        isLast,
+        weights,
+        rangeMinMidi,
+        rangeMaxMidi
+      );
+      if (Number.isFinite(repeatTargetMidi) && Math.random() < 0.35){
+        n.midi = mutateRepeatedMidi(n.midi, scalePCs, rangeMinMidi, rangeMaxMidi);
+      }
+      if (!motifMap.has(motifKey)) motifMap.set(motifKey, n.midi);
+      if (Number.isFinite(prevBefore)){
+        const iv = n.midi - prevBefore;
+        const absIv = Math.abs(iv);
+        if (absIv >= 7){
+          leapState.dir = Math.sign(iv) || leapState.dir;
+          leapState.size = absIv;
+        }else{
+          leapState.size = Math.max(0, leapState.size - 2);
+          if (leapState.size < 4) leapState.dir = 0;
+        }
+      }
       prevMidi = n.midi;
     }
 
+    lockLastNoteToStableTone(created, scalePCs, centerMidi, rangeMinMidi, rangeMaxMidi);
+    for (const n of created) notes.push(n);
     notes.sort((a,b)=> (a.step - b.step) || (a.midi - b.midi));
     if (mel && mel.sel && mel.sel.set){
       mel.sel.set = new Set(created);
@@ -2049,11 +2388,7 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
 
     rebuildAudio();
     renderAll();
-    if (created.length < count){
-      setStatus(`Randomized notes: ${created.length}/${count} (no overlap, mode=${cfg.mode})`);
-    }else{
-      setStatus(`Randomized notes: ${created.length} (mode=${cfg.mode})`);
-    }
+    setStatus(`Generated phrase: ${created.length} notes (${templateId}, span=${pitchSpan}st, mode=${cfg.mode})`);
   }
 
   // ======== UNDO/REDO ========
@@ -3602,6 +3937,9 @@ function hitNote(mx,my){
   randDensity.addEventListener("input", ()=>{
     randDensityLabel.textContent = randDensity.value;
   });
+  randPitchSpan.addEventListener("input", ()=>{
+    randPitchSpanLabel.textContent = `${randPitchSpan.value} st`;
+  });
   randIntNear.addEventListener("input", ()=>{
     randIntNearLabel.textContent = randIntNear.value;
   });
@@ -3610,6 +3948,24 @@ function hitNote(mx,my){
   });
   randIntFar.addEventListener("input", ()=>{
     randIntFarLabel.textContent = randIntFar.value;
+  });
+  randWChordTone.addEventListener("input", ()=>{
+    randWChordToneLabel.textContent = randWChordTone.value;
+  });
+  randWStepwise.addEventListener("input", ()=>{
+    randWStepwiseLabel.textContent = randWStepwise.value;
+  });
+  randWLeapRecover.addEventListener("input", ()=>{
+    randWLeapRecoverLabel.textContent = randWLeapRecover.value;
+  });
+  randWCenterPull.addEventListener("input", ()=>{
+    randWCenterPullLabel.textContent = randWCenterPull.value;
+  });
+  randWRepeat.addEventListener("input", ()=>{
+    randWRepeatLabel.textContent = randWRepeat.value;
+  });
+  randWEndStable.addEventListener("input", ()=>{
+    randWEndStableLabel.textContent = randWEndStable.value;
   });
   masterVol.addEventListener("input", ()=>{
     setMasterVolumePct(masterVol.value, false);
@@ -4361,7 +4717,7 @@ renderAll();
   function exportSong(){
     return {
       format: "piano-roll-song",
-      version: 4,
+      version: 5,
       meta: { title:"My Song", author:"You", created:new Date().toISOString() },
       transport: { bpm: Math.round(Tone.Transport.bpm.value), timeSignature:[4,4], bars:TOTAL_BARS, stepsPerBar:STEPS_PER_BAR },
       scale: { root: scaleRoot.value, type: scaleType.value },
@@ -4379,12 +4735,22 @@ renderAll();
         masterVolumePct: Number(masterVol.value || 85),
         randomize: {
           posMode: randPosMode.value,
+          rhythmTemplate: randRhythmTemplate?.value || "auto",
           barsSpan: Number(randBarsSpan.value || 4),
           density: Number(randDensity.value || 8),
+          pitchSpan: Number(randPitchSpan?.value || 24),
           intervalWeights: {
             near: Number(randIntNear.value || 6),
             mid: Number(randIntMid.value || 3),
             far: Number(randIntFar.value || 1)
+          },
+          ruleWeights: {
+            chordTone: Number(randWChordTone?.value || 7),
+            stepwise: Number(randWStepwise?.value || 7),
+            leapRecover: Number(randWLeapRecover?.value || 6),
+            centerPull: Number(randWCenterPull?.value || 5),
+            repeat: Number(randWRepeat?.value || 6),
+            endStable: Number(randWEndStable?.value || 8)
           }
         }
       }
@@ -4431,19 +4797,37 @@ renderAll();
     }
     if (data.ui?.randomize){
       if (typeof data.ui.randomize.posMode === "string") randPosMode.value = data.ui.randomize.posMode;
+      if (typeof data.ui.randomize.rhythmTemplate === "string") randRhythmTemplate.value = data.ui.randomize.rhythmTemplate;
       if (typeof data.ui.randomize.barsSpan === "number") randBarsSpan.value = String(clamp(data.ui.randomize.barsSpan, 1, 16));
       if (typeof data.ui.randomize.density === "number") randDensity.value = String(clamp(data.ui.randomize.density, 2, 16));
+      if (typeof data.ui.randomize.pitchSpan === "number") randPitchSpan.value = String(clamp(data.ui.randomize.pitchSpan, 6, 48));
       if (data.ui.randomize.intervalWeights){
         const iw = data.ui.randomize.intervalWeights;
         if (typeof iw.near === "number") randIntNear.value = String(clamp(iw.near, 0, 10));
         if (typeof iw.mid === "number") randIntMid.value = String(clamp(iw.mid, 0, 10));
         if (typeof iw.far === "number") randIntFar.value = String(clamp(iw.far, 0, 10));
       }
+      if (data.ui.randomize.ruleWeights){
+        const rw = data.ui.randomize.ruleWeights;
+        if (typeof rw.chordTone === "number") randWChordTone.value = String(clamp(rw.chordTone, 0, 10));
+        if (typeof rw.stepwise === "number") randWStepwise.value = String(clamp(rw.stepwise, 0, 10));
+        if (typeof rw.leapRecover === "number") randWLeapRecover.value = String(clamp(rw.leapRecover, 0, 10));
+        if (typeof rw.centerPull === "number") randWCenterPull.value = String(clamp(rw.centerPull, 0, 10));
+        if (typeof rw.repeat === "number") randWRepeat.value = String(clamp(rw.repeat, 0, 10));
+        if (typeof rw.endStable === "number") randWEndStable.value = String(clamp(rw.endStable, 0, 10));
+      }
       randBarsSpanLabel.textContent = randBarsSpan.value;
       randDensityLabel.textContent = randDensity.value;
+      randPitchSpanLabel.textContent = `${randPitchSpan.value} st`;
       randIntNearLabel.textContent = randIntNear.value;
       randIntMidLabel.textContent = randIntMid.value;
       randIntFarLabel.textContent = randIntFar.value;
+      randWChordToneLabel.textContent = randWChordTone.value;
+      randWStepwiseLabel.textContent = randWStepwise.value;
+      randWLeapRecoverLabel.textContent = randWLeapRecover.value;
+      randWCenterPullLabel.textContent = randWCenterPull.value;
+      randWRepeatLabel.textContent = randWRepeat.value;
+      randWEndStableLabel.textContent = randWEndStable.value;
     }
     btnToggleDrums.textContent = `Drums: ${ui.toggles.drums ? "ON":"OFF"}`;
     btnToggleChords.textContent = `Chords: ${ui.toggles.chords ? "ON":"OFF"}`;
@@ -4529,6 +4913,7 @@ renderAll();
     zoomLabel.textContent = zoom.value;
     randBarsSpanLabel.textContent = randBarsSpan.value;
     randDensityLabel.textContent = randDensity.value;
+    randPitchSpanLabel.textContent = `${randPitchSpan.value} st`;
     randIntNearLabel.textContent = randIntNear.value;
     randIntMidLabel.textContent = randIntMid.value;
     randIntFarLabel.textContent = randIntFar.value;
