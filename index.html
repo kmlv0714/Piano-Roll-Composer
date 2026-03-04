@@ -725,16 +725,20 @@
     return new Set(pat.map(x => (x + rootPc) % 12));
   }
 
-  const CHORD_LIST = [
-    "Em","E","E7","E5",
-    "D","D5","D7",
-    "C","C5","Cmaj7",
-    "G","G5","Gmaj7",
-    "Am","A","A5","A7",
-    "Bm","B","B5","B7",
-    "F","F5","Fmaj7",
-    "G#","G#5","G#7"
+  const CHORD_ROOTS = NOTE_NAMES.slice();
+  const CHORD_QUALITIES = [
+    "",      // major triad
+    "m",
+    "7",
+    "maj7",
+    "5",
+    "m7",
+    "sus4",
+    "dim",
+    "m7b5",
+    "aug"
   ];
+  const CHORD_LIST = CHORD_ROOTS.flatMap(root => CHORD_QUALITIES.map(q => root + q));
 
   // ======== AUDIO ========
 
@@ -1206,30 +1210,36 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
 
   // ======== CHORD PARSE / SCALE-FIT ========
   function parseChord(ch){
-    const m = ch.match(/^([A-G])(#|b)?(.*)$/);
+    const m = String(ch || "").trim().match(/^([A-G])(#|b)?(.*)$/);
     if (!m) return null;
-    let root = m[1] + (m[2]||"");
-    let qual = (m[3]||"");
+    let root = m[1] + (m[2] || "");
+    const qualRaw = (m[3] || "").trim();
+    const qual = qualRaw.replace(/\s+/g, "");
+
     root = root.replace("Db","C#").replace("Eb","D#").replace("Gb","F#").replace("Ab","G#").replace("Bb","A#");
     const rootMap = {C:0,"C#":1,D:2,"D#":3,E:4,F:5,"F#":6,G:7,"G#":8,A:9,"A#":10,B:11};
     const rootPc = rootMap[root];
     if (rootPc == null) return null;
 
-    const isMinor = qual.startsWith("m") && !qual.startsWith("maj");
-    const isMaj7 = qual.includes("maj7");
-    const is7 = qual.includes("7") && !isMaj7;
-    const isPower = qual.includes("5");
+    const qualityToIntervals = {
+      "":      [0,4,7],
+      "m":     [0,3,7],
+      "5":     [0,7],
+      "7":     [0,4,7,10],
+      "maj7":  [0,4,7,11],
+      "m7":    [0,3,7,10],
+      "sus4":  [0,5,7],
+      "dim":   [0,3,6],
+      "m7b5":  [0,3,6,10],
+      "aug":   [0,4,8],
+      "+":     [0,4,8]
+    };
 
-    let tones = [];
-    if (isPower) tones = [0,7];
-    else if (isMinor) tones = [0,3,7];
-    else tones = [0,4,7];
+    const intervals = qualityToIntervals[qual];
+    if (!intervals) return null;
 
-    if (isMaj7) tones.push(11);
-    else if (is7) tones.push(10);
-
-    tones = tones.map(x => (x + rootPc) % 12);
-    return {rootPc, tones};
+    const tones = intervals.map(x => (x + rootPc) % 12);
+    return {rootPc, tones, quality: (qual === "+" ? "aug" : qual)};
   }
 
   function romanNumeral(n){
