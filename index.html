@@ -85,6 +85,93 @@
       outline:none;
     }
     .row{margin-top:12px;display:grid;grid-template-columns:1fr;gap:12px;}
+    .mainLayout{
+      display:grid;
+      grid-template-columns:300px minmax(0,1fr);
+      gap:12px;
+      align-items:start;
+    }
+    @media (max-width: 980px){
+      .mainLayout{grid-template-columns:1fr;}
+    }
+    .phraseCard{
+      min-height:220px;
+      display:flex;
+      flex-direction:column;
+    }
+    .phraseBody{
+      padding:10px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .phraseToolbar{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+    .phraseNameLine{
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .phraseNameInput{
+      flex:1;
+      min-width:0;
+      background: rgba(0,0,0,.22);
+      border:1px solid var(--border);
+      color:var(--text);
+      border-radius:10px;
+      padding:7px 9px;
+      outline:none;
+    }
+    .phraseList{
+      border:1px solid var(--border);
+      border-radius:12px;
+      background: rgba(0,0,0,.16);
+      min-height:170px;
+      max-height:330px;
+      overflow:auto;
+      padding:6px;
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .phraseItem{
+      border:1px solid var(--border);
+      border-radius:10px;
+      background: rgba(255,255,255,.03);
+      padding:8px;
+      cursor:pointer;
+      user-select:none;
+      transition:.12s border-color ease, .12s filter ease;
+    }
+    .phraseItem:hover{filter:brightness(1.05);}
+    .phraseItem.selected{
+      border-color: rgba(56,189,248,.8);
+      box-shadow: 0 0 0 2px rgba(56,189,248,.22) inset;
+      background: rgba(56,189,248,.10);
+    }
+    .phraseItemTitle{
+      font-weight:700;
+      color:var(--text);
+      font-size:13px;
+      line-height:1.3;
+      margin-bottom:4px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .phraseItemMeta{
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.3;
+    }
+    .phraseStorageLine{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
     .panelHeader{
       display:flex;align-items:center;justify-content:space-between;
       padding:10px 12px;border-bottom:1px solid var(--border);
@@ -452,39 +539,68 @@
   </div>
 
   <div class="row">
-    <div class="card panel">
-      <div class="panelHeader">
-        <div class="title">Melody <span class="badge">Piano Roll</span></div>
-        <div id="posMelody" class="pos">#pos: 0.0</div>
+    <div class="mainLayout">
+      <div class="card phraseCard">
+        <div class="panelHeader">
+          <div class="title">Phrase Stocker <span class="badge">Library</span></div>
+        </div>
+        <div class="phraseBody">
+          <div class="phraseToolbar">
+            <button id="btnPhraseStock" class="btn good">Stock</button>
+            <button id="btnPhraseCopy" class="btn">Copy</button>
+            <button id="btnPhraseDelete" class="btn">Delete</button>
+          </div>
+          <div class="phraseNameLine">
+            <span class="small">Name</span>
+            <input id="phraseNameInput" class="phraseNameInput" type="text" placeholder="Select a phrase">
+          </div>
+          <div id="phraseList" class="phraseList"></div>
+          <div class="phraseStorageLine">
+            <button id="btnPhraseSave" class="btn">Save Stocker</button>
+            <label class="btn" style="cursor:pointer;">
+              Load Stocker
+              <input id="filePhraseLoad" type="file" accept="application/json" style="display:none">
+            </label>
+          </div>
+          <div id="phraseInfo" class="small">Copy notes in piano roll, then press Stock.</div>
+        </div>
       </div>
-      <div class="canvasWrap">
-        <div class="rulerRow">
-          <div class="pitchRulerPad"></div>
-          <div id="rulerScroll" class="scrollX">
-            <canvas id="rulerCanvas" height="34"></canvas>
-          </div>
-        </div>
-        <div class="melodyFlex">
-          <div class="pitchSide" id="pitchSide">
-            <canvas id="pitchCanvas" width="100" height="520"></canvas>
-          </div>
-          <div id="melodyScroll" class="scrollX">
-            <canvas id="melodyCanvas" height="520"></canvas>
-          </div>
-        </div>
-      
-        <div class="subHeader">
-          <div class="subtitle">Chords <span class="badge">Chord Lane</span></div>
-          <div id="posChords" class="pos">#pos: 0.0</div>
-        </div>
 
-<div class="chordRow">
+      <div class="card panel">
+        <div class="panelHeader">
+          <div class="title">Melody <span class="badge">Piano Roll</span></div>
+          <div id="posMelody" class="pos">#pos: 0.0</div>
+        </div>
+        <div class="canvasWrap">
+          <div class="rulerRow">
+            <div class="pitchRulerPad"></div>
+            <div id="rulerScroll" class="scrollX">
+              <canvas id="rulerCanvas" height="34"></canvas>
+            </div>
+          </div>
+          <div class="melodyFlex">
+            <div class="pitchSide" id="pitchSide">
+              <canvas id="pitchCanvas" width="100" height="520"></canvas>
+            </div>
+            <div id="melodyScroll" class="scrollX">
+              <canvas id="melodyCanvas" height="520"></canvas>
+            </div>
+          </div>
+        
+          <div class="subHeader">
+            <div class="subtitle">Chords <span class="badge">Chord Lane</span></div>
+            <div id="posChords" class="pos">#pos: 0.0</div>
+          </div>
+
+          <div class="chordRow">
             <div class="pitchRulerPad chordPad"></div>
             <div id="chordScroll" class="scrollX">
-          <canvas id="chordCanvas" height="96"></canvas>
+              <canvas id="chordCanvas" height="96"></canvas>
+            </div>
+          </div>
         </div>
-</div>
-</div>
+      </div>
+    </div>
 
   <div class="card ops">
     <div class="panelHeader">
@@ -528,6 +644,8 @@
       </div>
     </div>
   </div>
+
+</div>
 
 <script>
 (() => {
@@ -578,6 +696,14 @@
   const btnPaste = document.getElementById("btnPaste");
   const btnSave = document.getElementById("btnSave");
   const fileLoad = document.getElementById("fileLoad");
+  const btnPhraseStock = document.getElementById("btnPhraseStock");
+  const btnPhraseCopy = document.getElementById("btnPhraseCopy");
+  const btnPhraseDelete = document.getElementById("btnPhraseDelete");
+  const btnPhraseSave = document.getElementById("btnPhraseSave");
+  const filePhraseLoad = document.getElementById("filePhraseLoad");
+  const phraseNameInput = document.getElementById("phraseNameInput");
+  const phraseList = document.getElementById("phraseList");
+  const phraseInfo = document.getElementById("phraseInfo");
 
   const btnToggleDrums = document.getElementById("btnToggleDrums");
   const btnToggleChords = document.getElementById("btnToggleChords");
@@ -663,6 +789,9 @@
   const redoStack = [];
   const UNDO_MAX = 60;
   let clipboard = null;
+  let phraseStore = { version: 1, phrases: [] };
+  let selectedPhraseId = null;
+  let phraseIdSeq = 1;
 
   let prevScaleRoot = null;
 
@@ -2028,10 +2157,344 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     hold:{ timer:null, suppressClickUntil:0 }
   };
 
+  const PHRASE_STORE_FORMAT = "prc-phrase-stocker";
+
+  function nextPhraseId(){
+    return `phr_${Date.now().toString(36)}_${(phraseIdSeq++).toString(36)}`;
+  }
+
+  function phraseLengthFromNotes(noteList){
+    let end = 0;
+    for (const n of noteList){
+      const s = Number(n.step);
+      const d = Number(n.dur);
+      if (!Number.isFinite(s) || !Number.isFinite(d)) continue;
+      end = Math.max(end, s + Math.max(0, d));
+    }
+    return end;
+  }
+
+  function normalizePhraseNotes(rawNotes){
+    const out = [];
+    for (const n of (rawNotes || [])){
+      const step = Number(n.step);
+      const dur = Number(n.dur);
+      const midi = Number(n.midi);
+      const vel = Number(n.vel);
+      if (!Number.isFinite(step) || !Number.isFinite(dur) || !Number.isFinite(midi)) continue;
+      out.push({
+        step: Math.max(0, step),
+        dur: Math.max(0.5, dur),
+        midi: clamp(midi, midiMinLimit, midiMaxLimit),
+        vel: Number.isFinite(vel) ? vel : 1.0
+      });
+    }
+    if (!out.length) return [];
+    const minStep = Math.min(...out.map(n => n.step));
+    for (const n of out) n.step = Math.max(0, n.step - minStep);
+    out.sort((a,b)=> (a.step - b.step) || (a.midi - b.midi));
+    return out;
+  }
+
+  function getSelectedPhrase(){
+    if (!selectedPhraseId) return null;
+    return phraseStore.phrases.find(p => p.id === selectedPhraseId) || null;
+  }
+
+  function clipboardHasNotes(){
+    return !!(clipboard && Array.isArray(clipboard.notes) && clipboard.notes.length > 0);
+  }
+
+  function setPhraseInfo(text){
+    if (phraseInfo) phraseInfo.textContent = text;
+  }
+
+  function updatePhraseControls(){
+    const selected = getSelectedPhrase();
+    const canStock = clipboardHasNotes();
+    const canUseSelected = !!selected;
+
+    if (btnPhraseStock) btnPhraseStock.disabled = !canStock;
+    if (btnPhraseCopy) btnPhraseCopy.disabled = !canUseSelected;
+    if (btnPhraseDelete) btnPhraseDelete.disabled = !canUseSelected;
+    if (btnPhraseSave) btnPhraseSave.disabled = !(phraseStore.phrases.length > 0);
+    if (phraseNameInput){
+      phraseNameInput.disabled = !canUseSelected;
+      phraseNameInput.value = canUseSelected ? selected.name : "";
+      phraseNameInput.placeholder = canUseSelected ? "" : "Select a phrase";
+    }
+    if (!canUseSelected){
+      setPhraseInfo(canStock ? "Ready: press Stock to add copied notes." : "Copy notes in piano roll, then press Stock.");
+    }
+  }
+
+  function renderPhraseList(){
+    if (!phraseList) return;
+    phraseList.innerHTML = "";
+
+    if (!phraseStore.phrases.length){
+      const empty = document.createElement("div");
+      empty.className = "small";
+      empty.style.padding = "8px";
+      empty.textContent = "No phrases stocked yet.";
+      phraseList.appendChild(empty);
+      updatePhraseControls();
+      return;
+    }
+
+    for (const phrase of phraseStore.phrases){
+      const item = document.createElement("div");
+      item.className = "phraseItem" + (phrase.id === selectedPhraseId ? " selected" : "");
+      item.dataset.id = phrase.id;
+
+      const title = document.createElement("div");
+      title.className = "phraseItemTitle";
+      title.textContent = phrase.name;
+      item.appendChild(title);
+
+      const barsApprox = (phrase.lengthSteps / STEPS_PER_BAR).toFixed(2);
+      const meta = document.createElement("div");
+      meta.className = "phraseItemMeta";
+      meta.textContent = `${phrase.notes.length} notes / len ${phrase.lengthSteps} steps (${barsApprox} bars)`;
+      item.appendChild(meta);
+
+      item.addEventListener("click", ()=>{
+        selectedPhraseId = phrase.id;
+        renderPhraseList();
+        updatePhraseControls();
+        previewPhrase(phrase);
+      });
+      phraseList.appendChild(item);
+    }
+
+    updatePhraseControls();
+  }
+
+  function selectPhrase(id){
+    selectedPhraseId = id;
+    renderPhraseList();
+    updatePhraseControls();
+  }
+
+  function stepSpanToSeconds(stepSpan){
+    const s = Math.max(0, Number(stepSpan) || 0);
+    if (s <= 0) return 0;
+    try{
+      return Tone.Time(stepToTime(s)).toSeconds();
+    }catch(e){}
+    const bpm = Math.max(1, Number(tempo?.value || 120));
+    return (60 / bpm / 4) * s;
+  }
+
+  async function previewPhrase(phrase){
+    if (!phrase || !phrase.notes || !phrase.notes.length) return;
+    try{ await Tone.start(); }catch(e){}
+    const startAt = Tone.now() + 0.02;
+
+    for (const n of phrase.notes){
+      const start = startAt + stepSpanToSeconds(n.step);
+      const durSec = Math.max(0.02, stepSpanToSeconds(n.dur) - 0.01);
+      try { markSoundActivity(); } catch(e) {}
+      try{
+        polyLead.triggerAttackRelease(
+          Tone.Frequency(n.midi, "midi").toFrequency(),
+          durSec,
+          start,
+          n.vel ?? 0.9
+        );
+      }catch(e){}
+    }
+
+    const totalSec = Math.max(0.05, stepSpanToSeconds(phrase.lengthSteps));
+    setStatus(`Preview: ${phrase.name}`);
+    setPhraseInfo(`Previewing "${phrase.name}" (${totalSec.toFixed(2)}s)`);
+  }
+
+  function stockPhraseFromClipboard(){
+    if (!clipboardHasNotes()){
+      setStatus("Nothing to stock (copy notes first)");
+      setPhraseInfo("Stock failed: copy notes first.");
+      updatePhraseControls();
+      return;
+    }
+    const notesOnly = normalizePhraseNotes(clipboard.notes);
+    if (!notesOnly.length){
+      setStatus("Nothing to stock (clipboard notes empty)");
+      setPhraseInfo("Stock failed: copied content has no notes.");
+      updatePhraseControls();
+      return;
+    }
+
+    const lengthSteps = Math.max(1, phraseLengthFromNotes(notesOnly));
+    const phrase = {
+      id: nextPhraseId(),
+      name: `Phrase ${phraseStore.phrases.length + 1}`,
+      notes: notesOnly,
+      lengthSteps,
+      createdAt: new Date().toISOString()
+    };
+    phraseStore.phrases.push(phrase);
+    selectPhrase(phrase.id);
+    setStatus(`Phrase stocked: ${phrase.name}`);
+    setPhraseInfo(`Stocked "${phrase.name}" (${notesOnly.length} notes).`);
+  }
+
+  function copySelectedPhraseToClipboard(){
+    const phrase = getSelectedPhrase();
+    if (!phrase){
+      setStatus("No phrase selected");
+      setPhraseInfo("Copy failed: select a phrase.");
+      return;
+    }
+    clipboard = {
+      minStep: 0,
+      notes: deepClone(phrase.notes),
+      chords: []
+    };
+    updatePhraseControls();
+    setStatus(`Phrase copied: ${phrase.name}`);
+    setPhraseInfo(`Copied "${phrase.name}" to clipboard.`);
+  }
+
+  function deleteSelectedPhrase(){
+    const phrase = getSelectedPhrase();
+    if (!phrase){
+      setStatus("No phrase selected");
+      return;
+    }
+    if (!confirm(`Delete phrase "${phrase.name}"?`)) return;
+
+    const idx = phraseStore.phrases.findIndex(p => p.id === phrase.id);
+    phraseStore.phrases = phraseStore.phrases.filter(p => p.id !== phrase.id);
+    if (!phraseStore.phrases.length){
+      selectedPhraseId = null;
+    }else{
+      const nextIdx = Math.min(idx, phraseStore.phrases.length - 1);
+      selectedPhraseId = phraseStore.phrases[nextIdx].id;
+    }
+    renderPhraseList();
+    setStatus(`Phrase deleted: ${phrase.name}`);
+    setPhraseInfo(`Deleted "${phrase.name}".`);
+  }
+
+  function exportPhraseStoreData(){
+    return {
+      format: PHRASE_STORE_FORMAT,
+      version: 1,
+      phrases: phraseStore.phrases.map(p => ({
+        id: p.id,
+        name: p.name,
+        notes: p.notes.map(n => ({ step:n.step, dur:n.dur, midi:n.midi, vel:n.vel ?? 1.0 })),
+        lengthSteps: p.lengthSteps,
+        createdAt: p.createdAt || null
+      }))
+    };
+  }
+
+  function importPhraseStoreData(data){
+    if (!data || data.format !== PHRASE_STORE_FORMAT){
+      throw new Error("Unknown phrase stocker format");
+    }
+    const arr = Array.isArray(data.phrases) ? data.phrases : [];
+    const usedIds = new Set();
+    const loaded = [];
+
+    for (let i=0; i<arr.length; i++){
+      const src = arr[i] || {};
+      const notesNorm = normalizePhraseNotes(src.notes || []);
+      if (!notesNorm.length) continue;
+      let id = String(src.id || "").trim();
+      if (!id || usedIds.has(id)) id = nextPhraseId();
+      usedIds.add(id);
+      const name = String(src.name || `Phrase ${loaded.length + 1}`).trim() || `Phrase ${loaded.length + 1}`;
+      const minLen = Math.max(1, phraseLengthFromNotes(notesNorm));
+      const len = Math.max(minLen, Number(src.lengthSteps) || 0);
+      loaded.push({
+        id,
+        name,
+        notes: notesNorm,
+        lengthSteps: len,
+        createdAt: src.createdAt || null
+      });
+    }
+
+    phraseStore = { version: 1, phrases: loaded };
+    selectedPhraseId = loaded.length ? loaded[0].id : null;
+    renderPhraseList();
+    setStatus(`Phrase stocker loaded (${loaded.length} phrases)`);
+    setPhraseInfo(`Loaded ${loaded.length} phrases.`);
+  }
+
+  function savePhraseStoreToFile(){
+    if (!phraseStore.phrases.length){
+      setStatus("Phrase stocker is empty");
+      return;
+    }
+    const data = exportPhraseStoreData();
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "phrase-stocker.json";
+    a.click();
+    setTimeout(()=> URL.revokeObjectURL(url), 1200);
+    setStatus("Phrase stocker saved");
+    setPhraseInfo(`Saved ${phraseStore.phrases.length} phrases.`);
+  }
+
+  function initPhraseStockerUI(){
+    if (btnPhraseStock) btnPhraseStock.addEventListener("click", stockPhraseFromClipboard);
+    if (btnPhraseCopy) btnPhraseCopy.addEventListener("click", copySelectedPhraseToClipboard);
+    if (btnPhraseDelete) btnPhraseDelete.addEventListener("click", deleteSelectedPhrase);
+    if (btnPhraseSave) btnPhraseSave.addEventListener("click", savePhraseStoreToFile);
+
+    if (filePhraseLoad){
+      filePhraseLoad.addEventListener("change", async ()=>{
+        const f = filePhraseLoad.files && filePhraseLoad.files[0];
+        if (!f) return;
+        try{
+          const txt = await f.text();
+          importPhraseStoreData(JSON.parse(txt));
+        }catch(err){
+          console.error(err);
+          setStatus("Phrase stocker load failed");
+          setPhraseInfo(`Load failed: ${err.message}`);
+        }finally{
+          filePhraseLoad.value = "";
+        }
+      });
+    }
+
+    if (phraseNameInput){
+      phraseNameInput.addEventListener("input", ()=>{
+        const p = getSelectedPhrase();
+        if (!p) return;
+        const v = String(phraseNameInput.value || "").trim();
+        p.name = v || p.name;
+        renderPhraseList();
+      });
+      phraseNameInput.addEventListener("blur", ()=>{
+        const p = getSelectedPhrase();
+        if (!p) return;
+        p.name = String(phraseNameInput.value || "").trim() || p.name || "Untitled";
+        updatePhraseControls();
+        renderPhraseList();
+      });
+    }
+
+    renderPhraseList();
+    updatePhraseControls();
+  }
+
   function copySelection(){
     const selNotes = Array.from(mel.sel.set);
     const selChords = Array.from(cho.sel.set);
-    if (!selNotes.length && !selChords.length){ setStatus("Nothing selected"); return; }
+    if (!selNotes.length && !selChords.length){
+      setStatus("Nothing selected");
+      setPhraseInfo("Copy failed: nothing selected.");
+      updatePhraseControls();
+      return;
+    }
     const minStep = Math.min(
       selNotes.length ? Math.min(...selNotes.map(n=>n.step)) : Infinity,
       selChords.length ? Math.min(...selChords.map(c=>c.start)) : Infinity
@@ -2041,6 +2504,12 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
       notes: selNotes.map(n=>({step:n.step-minStep,dur:n.dur,midi:n.midi,vel:n.vel})),
       chords: selChords.map(c=>({start:c.start-minStep,dur:c.dur,chord:c.chord}))
     };
+    updatePhraseControls();
+    if (selNotes.length){
+      setPhraseInfo(`Copied ${selNotes.length} notes. Press Stock to store as phrase.`);
+    } else {
+      setPhraseInfo("Copied content has no notes. Phrase stock needs notes.");
+    }
     setStatus("Copied");
   }
   function pasteClipboard(){
@@ -4052,6 +4521,7 @@ renderAll();
 
   // ======== INIT ========
   function init(){
+    initPhraseStockerUI();
     setupChordPickerUI();
     setTopTab("input");
     tempoLabel.textContent = tempo.value;
