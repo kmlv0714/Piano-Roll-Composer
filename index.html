@@ -176,6 +176,92 @@
     .ops .opsBody{padding:12px 14px;display:flex;flex-direction:column;gap:10px;color:rgba(255,255,255,0.86);font-size:13px;line-height:1.55}
     .ops .opline b{color:rgba(255,255,255,0.95);}
 
+    .chordPickerOverlay{
+      position:fixed;
+      inset:0;
+      z-index:12000;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      background:rgba(3,8,18,0.58);
+      backdrop-filter: blur(1px);
+    }
+    .chordPickerOverlay.show{display:flex;}
+    .chordPickerWindow{
+      width:min(760px, calc(100vw - 24px));
+      max-height:calc(100vh - 24px);
+      overflow:auto;
+      padding:12px;
+      border:1px solid var(--border);
+    }
+    .chordPickerHead{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:10px;
+    }
+    .chordPickerTitle{
+      font-weight:800;
+      letter-spacing:.3px;
+    }
+    .chordPickerPreview{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size:14px;
+      color:var(--text);
+    }
+    .chordPickerFit{
+      font-size:12px;
+      color:var(--muted);
+      margin-bottom:8px;
+    }
+    .chordPickerFit.fit{color:rgba(34,197,94,0.95);}
+    .chordPickerFit.out{color:rgba(248,113,113,0.95);}
+    .chordPickerSection{
+      margin-top:10px;
+    }
+    .chordPickerSectionLabel{
+      font-size:12px;
+      color:var(--muted);
+      margin:0 0 6px 2px;
+    }
+    .chordPickerGrid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill, minmax(62px, 1fr));
+      gap:8px;
+    }
+    .chordPickBtn{
+      cursor:pointer;
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:7px 8px;
+      background:rgba(255,255,255,0.04);
+      color:var(--text);
+      font-weight:700;
+      text-align:center;
+      user-select:none;
+      transition:.12s border-color ease, .12s filter ease, .12s transform ease;
+    }
+    .chordPickBtn:hover{filter:brightness(1.06); transform:translateY(-1px);}
+    .chordPickBtn.selected{
+      border-color:rgba(56,189,248,.85);
+      box-shadow:0 0 0 2px rgba(56,189,248,.24) inset;
+      background:rgba(56,189,248,0.12);
+    }
+    .chordPickBtn.fit{
+      border-color:rgba(34,197,94,.6);
+    }
+    .chordPickBtn.out{
+      border-color:rgba(248,113,113,.5);
+      background:rgba(248,113,113,0.08);
+    }
+    .chordPickerActions{
+      display:flex;
+      justify-content:flex-end;
+      gap:8px;
+      margin-top:12px;
+    }
+
 
 /* ===== Mascot overlay ===== */
 #mascotDock{
@@ -408,7 +494,7 @@
       <div class="opline"><b>Horizontal Scroll:</b> Drag empty area in the roll, or drag on the ruler.</div>
       <div class="opline"><b>Playback:</b> Press <span class="k">Space</span> to Play/Stop. During playback, Follow mode auto-scrolls.</div>
       <div class="opline"><b>Notes:</b> <span class="k">Click</span> to place at step cursor, <span class="k">Drag</span> to move/resize, <span class="k">Wheel</span> for velocity, <span class="k">Right Click</span> to delete.</div>
-      <div class="opline"><b>Chords:</b> <span class="k">Drag</span> to move/resize, <span class="k">Wheel</span> to switch chord, <span class="k">Right Click</span> to delete, <span class="k">Click</span> to open chord picker.</div>
+      <div class="opline"><b>Chords:</b> <span class="k">Drag</span> to move/resize, <span class="k">Wheel</span> to switch chord, <span class="k">Right Click</span> to delete, <span class="k">Long Press</span> to open chord picker.</div>
     </div>
   </div>
 
@@ -417,6 +503,31 @@
     <div class="small">Scroll/edit while stopped, and use Follow during playback for smoother tracking.</div>
   </div>
 </div>
+
+  <div id="chordPickerOverlay" class="chordPickerOverlay" aria-hidden="true">
+    <div id="chordPickerWindow" class="card chordPickerWindow" role="dialog" aria-modal="true" aria-label="Chord Picker">
+      <div class="chordPickerHead">
+        <div class="chordPickerTitle">Chord Picker</div>
+        <div id="chordPickerPreview" class="chordPickerPreview">--</div>
+      </div>
+      <div id="chordPickerFit" class="chordPickerFit">Scale fit: --</div>
+
+      <div class="chordPickerSection">
+        <div class="chordPickerSectionLabel">Root</div>
+        <div id="chordPickerRoots" class="chordPickerGrid"></div>
+      </div>
+
+      <div class="chordPickerSection">
+        <div class="chordPickerSectionLabel">Quality</div>
+        <div id="chordPickerQualities" class="chordPickerGrid"></div>
+      </div>
+
+      <div class="chordPickerActions">
+        <button id="btnChordPickerApply" class="btn good">Apply</button>
+        <button id="btnChordPickerClose" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
 
 <script>
 (() => {
@@ -506,6 +617,17 @@
 
   const tabButtons = Array.from(document.querySelectorAll(".tabBtn"));
   const tabPanels = Array.from(document.querySelectorAll(".tabPanel"));
+  const chordPickerOverlay = document.getElementById("chordPickerOverlay");
+  const chordPickerWindow = document.getElementById("chordPickerWindow");
+  const chordPickerPreview = document.getElementById("chordPickerPreview");
+  const chordPickerFit = document.getElementById("chordPickerFit");
+  const chordPickerRoots = document.getElementById("chordPickerRoots");
+  const chordPickerQualities = document.getElementById("chordPickerQualities");
+  const btnChordPickerApply = document.getElementById("btnChordPickerApply");
+  const btnChordPickerClose = document.getElementById("btnChordPickerClose");
+
+  const CHORD_LONG_PRESS_MS = 450;
+  const CHORD_LONG_PRESS_MOVE_PX = 6;
 
   function setTopTab(tabName){
     for (const btn of tabButtons){
@@ -739,6 +861,18 @@
     "aug"
   ];
   const CHORD_LIST = CHORD_ROOTS.flatMap(root => CHORD_QUALITIES.map(q => root + q));
+  const CHORD_QUALITY_LABEL = {
+    "": "maj",
+    "m": "m",
+    "7": "7",
+    "maj7": "maj7",
+    "5": "5",
+    "m7": "m7",
+    "sus4": "sus4",
+    "dim": "dim",
+    "m7b5": "m7b5",
+    "aug": "aug"
+  };
 
   // ======== AUDIO ========
 
@@ -1242,6 +1376,168 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     return {rootPc, tones, quality: (qual === "+" ? "aug" : qual)};
   }
 
+  const chordPickerState = {
+    open: false,
+    target: null,
+    root: "C",
+    quality: "",
+    rootBtns: new Map(),
+    qualityBtns: new Map()
+  };
+
+  function normalizeChordRoot(root){
+    let r = String(root || "").trim();
+    r = r.replace("Db","C#").replace("Eb","D#").replace("Gb","F#").replace("Ab","G#").replace("Bb","A#");
+    return (ROOT_PC[r] == null) ? "C" : r;
+  }
+
+  function normalizeChordQuality(quality){
+    let q = String(quality || "").trim().replace(/\s+/g, "");
+    if (q === "+") q = "aug";
+    return CHORD_QUALITIES.includes(q) ? q : "";
+  }
+
+  function parseChordNameParts(name){
+    const m = String(name || "").trim().match(/^([A-G])(#|b)?(.*)$/);
+    if (!m) return { root:"C", quality:"" };
+    const root = normalizeChordRoot(m[1] + (m[2] || ""));
+    const quality = normalizeChordQuality(m[3] || "");
+    return { root, quality };
+  }
+
+  function chordNameFromParts(root, quality){
+    return `${normalizeChordRoot(root)}${normalizeChordQuality(quality)}`;
+  }
+
+  function refreshChordPickerUI(){
+    if (!chordPickerOverlay || !chordPickerState.open) return;
+    const current = chordNameFromParts(chordPickerState.root, chordPickerState.quality);
+    const scalePCs = getSelectedScalePCs();
+    const currentFits = chordFitsScale(current, scalePCs);
+
+    if (chordPickerPreview) chordPickerPreview.textContent = current;
+    if (chordPickerFit){
+      chordPickerFit.textContent = currentFits ? "Scale fit: In scale" : "Scale fit: Out of scale";
+      chordPickerFit.classList.toggle("fit", currentFits);
+      chordPickerFit.classList.toggle("out", !currentFits);
+    }
+
+    for (const [root, btn] of chordPickerState.rootBtns.entries()){
+      const fit = chordFitsScale(chordNameFromParts(root, chordPickerState.quality), scalePCs);
+      btn.classList.toggle("selected", chordPickerState.root === root);
+      btn.classList.toggle("fit", fit);
+      btn.classList.toggle("out", !fit);
+      btn.title = fit ? "In scale" : "Out of scale";
+    }
+    for (const [quality, btn] of chordPickerState.qualityBtns.entries()){
+      const fit = chordFitsScale(chordNameFromParts(chordPickerState.root, quality), scalePCs);
+      btn.classList.toggle("selected", chordPickerState.quality === quality);
+      btn.classList.toggle("fit", fit);
+      btn.classList.toggle("out", !fit);
+      btn.title = fit ? "In scale" : "Out of scale";
+    }
+  }
+
+  function openChordPickerForChord(chordObj){
+    if (!chordObj || !chordPickerOverlay) return;
+    const parts = parseChordNameParts(chordObj.chord);
+    chordPickerState.target = chordObj;
+    chordPickerState.root = parts.root;
+    chordPickerState.quality = parts.quality;
+    chordPickerState.open = true;
+    chordPickerOverlay.classList.add("show");
+    chordPickerOverlay.setAttribute("aria-hidden", "false");
+    refreshChordPickerUI();
+  }
+
+  function closeChordPicker(){
+    if (!chordPickerOverlay) return;
+    chordPickerState.open = false;
+    chordPickerState.target = null;
+    chordPickerOverlay.classList.remove("show");
+    chordPickerOverlay.setAttribute("aria-hidden", "true");
+  }
+
+  function applyChordPickerSelection(){
+    const target = chordPickerState.target;
+    if (!target) return;
+    if (!chords.includes(target)){
+      closeChordPicker();
+      return;
+    }
+    const nextChord = chordNameFromParts(chordPickerState.root, chordPickerState.quality);
+    if (!parseChord(nextChord)) return;
+
+    if (target.chord !== nextChord){
+      pushUndo("Set chord");
+      target.chord = nextChord;
+      chords.sort((a,b)=>a.start-b.start);
+      rebuildAudio();
+      renderAll();
+    }
+
+    const fits = chordFitsScale(nextChord, getSelectedScalePCs());
+    setStatus(fits ? `Chord set: ${nextChord}` : `Chord set: ${nextChord} (out of scale)`);
+    try{ auditionChordOnClick(nextChord); }catch(e){}
+    refreshChordPickerUI();
+  }
+
+  function setupChordPickerUI(){
+    if (!chordPickerRoots || !chordPickerQualities) return;
+
+    chordPickerRoots.innerHTML = "";
+    chordPickerQualities.innerHTML = "";
+    chordPickerState.rootBtns.clear();
+    chordPickerState.qualityBtns.clear();
+
+    for (const root of CHORD_ROOTS){
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "chordPickBtn";
+      btn.dataset.root = root;
+      btn.textContent = root;
+      btn.addEventListener("click", ()=>{
+        chordPickerState.root = root;
+        refreshChordPickerUI();
+      });
+      chordPickerRoots.appendChild(btn);
+      chordPickerState.rootBtns.set(root, btn);
+    }
+
+    for (const quality of CHORD_QUALITIES){
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "chordPickBtn";
+      btn.dataset.quality = quality;
+      btn.textContent = CHORD_QUALITY_LABEL[quality] || quality || "maj";
+      btn.addEventListener("click", ()=>{
+        chordPickerState.quality = quality;
+        refreshChordPickerUI();
+      });
+      chordPickerQualities.appendChild(btn);
+      chordPickerState.qualityBtns.set(quality, btn);
+    }
+
+    if (btnChordPickerApply){
+      btnChordPickerApply.addEventListener("click", ()=>{
+        applyChordPickerSelection();
+      });
+    }
+    if (btnChordPickerClose){
+      btnChordPickerClose.addEventListener("click", closeChordPicker);
+    }
+    if (chordPickerOverlay){
+      chordPickerOverlay.addEventListener("click", (e)=>{
+        if (e.target === chordPickerOverlay) closeChordPicker();
+      });
+    }
+    window.addEventListener("keydown", (e)=>{
+      if (e.key === "Escape" && chordPickerState.open){
+        closeChordPicker();
+      }
+    });
+  }
+
   function romanNumeral(n){
     const map = {1:"I",2:"II",3:"III",4:"IV",5:"V",6:"VI",7:"VII"};
     return map[n] ?? "?";
@@ -1726,7 +2022,11 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
 
   // ======== COPY/PASTE ========
   const mel = { drag:{ mode:null, target:null, startX:0, startY:0, orig:null, ghost:null }, sel:{ active:false, rect:{x:0,y:0,w:0,h:0}, set:new Set() } };
-  const cho = { drag:{ mode:null, target:null, startX:0, startY:0, orig:null, ghost:null }, sel:{ active:false, rect:{x:0,y:0,w:0,h:0}, set:new Set() } };
+  const cho = {
+    drag:{ mode:null, target:null, startX:0, startY:0, startClientX:0, startClientY:0, orig:null, ghost:null },
+    sel:{ active:false, rect:{x:0,y:0,w:0,h:0}, set:new Set() },
+    hold:{ timer:null, suppressClickUntil:0 }
+  };
 
   function copySelection(){
     const selNotes = Array.from(mel.sel.set);
@@ -2510,11 +2810,32 @@ function hitNote(mx,my){
     pushUndo("Delete chord");
     chords = chords.filter(x=>x!==c);
     cho.sel.set.delete(c);
+    if (chordPickerState.open && chordPickerState.target === c){
+      closeChordPicker();
+    }
     rebuildAudio(); renderAll(); setStatus("Chord deleted");
+  }
+
+  function clearChordHoldTimer(){
+    if (cho.hold.timer){
+      clearTimeout(cho.hold.timer);
+      cho.hold.timer = null;
+    }
   }
 
   chordCanvas.addEventListener("mousemove",(e)=>{
     const {mx,my} = canvasMousePos(chordCanvas, e);
+
+    if (cho.drag.mode === "pending"){
+      const moved = Math.hypot(e.clientX - cho.drag.startClientX, e.clientY - cho.drag.startClientY);
+      if (moved >= CHORD_LONG_PRESS_MOVE_PX){
+        clearChordHoldTimer();
+        cho.drag.mode = "move";
+      } else {
+        chordCanvas.style.cursor = "grab";
+        return;
+      }
+    }
 
     if (cho.drag.mode){
       const dxSteps = quant(xToStep(mx) - xToStep(cho.drag.startX));
@@ -2538,6 +2859,7 @@ function hitNote(mx,my){
   });
 
   chordCanvas.addEventListener("mousedown",(e)=>{
+    if (e.button !== 0) return;
     markUserScroll();
     const {mx,my} = canvasMousePos(chordCanvas, e);
     const hit = hitChord(mx,my);
@@ -2551,20 +2873,46 @@ function hitNote(mx,my){
       }
 
       cho.drag.startX = mx;
+      cho.drag.startClientX = e.clientX;
+      cho.drag.startClientY = e.clientY;
       cho.drag.target = hit.c;
       cho.drag.orig = deepClone(hit.c);
-      cho.drag.mode = hit.edge ? "resize" : "move";
       cho.drag.ghost = null;
+
+      if (e.button === 0 && !hit.edge && !e.shiftKey){
+        clearChordHoldTimer();
+        cho.drag.mode = "pending";
+        cho.hold.suppressClickUntil = 0;
+        const pressedChord = hit.c;
+        cho.hold.timer = setTimeout(()=>{
+          cho.hold.timer = null;
+          if (cho.drag.mode !== "pending" || cho.drag.target !== pressedChord) return;
+          cho.drag.mode = null;
+          cho.drag.ghost = null;
+          cho.hold.suppressClickUntil = performance.now() + 450;
+          openChordPickerForChord(pressedChord);
+          renderAll();
+        }, CHORD_LONG_PRESS_MS);
+        renderAll();
+        return;
+      }
+
+      clearChordHoldTimer();
+      cho.drag.mode = hit.edge ? "resize" : "move";
       renderAll();
       return;
     }
 
+    clearChordHoldTimer();
     addChordAt(mx);
   });
 
   chordCanvas.addEventListener("click",(e)=>{
     // left click only; don't fire during drag
     if (e.button !== 0) return;
+    if (performance.now() < (cho.hold.suppressClickUntil || 0)){
+      return;
+    }
     if (cho.drag && cho.drag.mode) return;
     const {mx,my} = canvasMousePos(chordCanvas, e);
     const hit = hitChord(mx,my);
@@ -2575,7 +2923,15 @@ function hitNote(mx,my){
 
 
   chordCanvas.addEventListener("mouseup",(e)=>{
+    if (cho.drag.mode === "pending"){
+      clearChordHoldTimer();
+      cho.drag.mode = null;
+      cho.drag.ghost = null;
+      return;
+    }
+
     if (!cho.drag.mode) return;
+    clearChordHoldTimer();
 
     const {mx} = canvasMousePos(chordCanvas, e);
     const dxSteps = quant(xToStep(mx) - xToStep(cho.drag.startX));
@@ -2599,6 +2955,14 @@ function hitNote(mx,my){
       cho.drag.mode = null; cho.drag.ghost = null;
       rebuildAudio(); renderAll(); setStatus("Chord resized");
       return;
+    }
+  });
+
+  window.addEventListener("mouseup", ()=>{
+    if (cho.drag.mode === "pending"){
+      clearChordHoldTimer();
+      cho.drag.mode = null;
+      cho.drag.ghost = null;
     }
   });
 
@@ -2872,6 +3236,7 @@ function hitNote(mx,my){
     }
 
     prevScaleRoot = nextRoot;
+    if (chordPickerState.open) refreshChordPickerUI();
 
     renderAll();
     if (ui.autoRetune) retuneAllNotesToScale();
@@ -3687,6 +4052,7 @@ renderAll();
 
   // ======== INIT ========
   function init(){
+    setupChordPickerUI();
     setTopTab("input");
     tempoLabel.textContent = tempo.value;
     barsLabel.textContent = bars.value;
