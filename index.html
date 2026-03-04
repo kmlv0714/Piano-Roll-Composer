@@ -405,6 +405,7 @@
         <button type="button" class="btn tabBtn active" data-tab="input">Input</button>
         <button type="button" class="btn tabBtn" data-tab="sound">Sound</button>
         <button type="button" class="btn tabBtn" data-tab="scale">Scale</button>
+        <button type="button" class="btn tabBtn" data-tab="chordgen">Chord Gen</button>
         <button type="button" class="btn tabBtn" data-tab="random">Random</button>
         <button type="button" class="btn tabBtn" data-tab="edit">Edit/View</button>
       </div>
@@ -458,6 +459,55 @@
           <button id="btnAutoRetune" class="btn">AutoRetune: ON</button>
           <button id="btnToggleAssist" class="btn">Assist: ON</button>
           <button id="btnToggleChordTones" class="btn">Chord Tones: ON</button>
+        </div>
+
+        <div class="tabPanel" data-tab-panel="chordgen">
+          <label class="pill">Key
+            <select id="chordGenKey">
+              <option>C</option><option>C#</option><option>D</option><option>D#</option><option>E</option><option>F</option>
+              <option>F#</option><option>G</option><option>G#</option><option>A</option><option>A#</option><option>B</option>
+            </select>
+          </label>
+          <label class="pill">Mode
+            <select id="chordGenMode">
+              <option value="major" selected>Major</option>
+              <option value="natural_minor">Natural Minor</option>
+            </select>
+          </label>
+          <label class="pill">Bars
+            <input id="chordGenBars" type="range" min="1" max="16" value="16" style="width:120px">
+            <span id="chordGenBarsLabel">16</span>
+          </label>
+          <label class="pill">Steps
+            <span id="chordGenStepsLabel">256</span>
+          </label>
+          <label class="pill">Chord Dur
+            <select id="chordGenDur">
+              <option value="4">4</option>
+              <option value="8">8</option>
+              <option value="16" selected>16</option>
+              <option value="32">32</option>
+            </select>
+          </label>
+          <label class="pill">Cadence
+            <select id="chordGenCadence">
+              <option value="perfect" selected>Perfect</option>
+              <option value="plagal">Plagal</option>
+              <option value="half">Half</option>
+              <option value="deceptive">Deceptive</option>
+            </select>
+          </label>
+          <label class="pill">Complexity
+            <select id="chordGenComplexity">
+              <option value="triad" selected>Triad</option>
+              <option value="seventh">7th</option>
+            </select>
+          </label>
+          <button id="btnChordGenGenerate" class="btn good">Generate</button>
+          <button id="btnChordGenPreview" class="btn">Preview</button>
+          <button id="btnChordGenApply" class="btn">Apply</button>
+          <button id="btnChordGenReroll" class="btn">Reroll</button>
+          <div id="chordGenInfo" class="small">Generate a draft progression, then Preview/Apply.</div>
         </div>
 
         <div class="tabPanel" data-tab-panel="random">
@@ -764,6 +814,19 @@
   const pitchLowOct = document.getElementById("pitchLowOct");
   const pitchHighOct = document.getElementById("pitchHighOct");
   const btnRetune = document.getElementById("btnRetune");
+  const chordGenKey = document.getElementById("chordGenKey");
+  const chordGenMode = document.getElementById("chordGenMode");
+  const chordGenBars = document.getElementById("chordGenBars");
+  const chordGenBarsLabel = document.getElementById("chordGenBarsLabel");
+  const chordGenStepsLabel = document.getElementById("chordGenStepsLabel");
+  const chordGenDur = document.getElementById("chordGenDur");
+  const chordGenCadence = document.getElementById("chordGenCadence");
+  const chordGenComplexity = document.getElementById("chordGenComplexity");
+  const btnChordGenGenerate = document.getElementById("btnChordGenGenerate");
+  const btnChordGenPreview = document.getElementById("btnChordGenPreview");
+  const btnChordGenApply = document.getElementById("btnChordGenApply");
+  const btnChordGenReroll = document.getElementById("btnChordGenReroll");
+  const chordGenInfo = document.getElementById("chordGenInfo");
   const btnRandomizeSelectedPitch = document.getElementById("btnRandomizeSelectedPitch");
   const randPosMode = document.getElementById("randPosMode");
   const randBarsSpan = document.getElementById("randBarsSpan");
@@ -845,6 +908,13 @@
   let phraseStore = { version: 1, phrases: [] };
   let selectedPhraseId = null;
   let phraseIdSeq = 1;
+  const chordGenState = {
+    draft: [],
+    lastSpec: null,
+    lastScore: 0,
+    previewToken: 0,
+    previewTimer: null
+  };
 
   let prevScaleRoot = null;
 
@@ -2391,6 +2461,366 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     setStatus(`Generated phrase: ${created.length} notes (${templateId}, span=${pitchSpan}st, mode=${cfg.mode})`);
   }
 
+  const CHORD_GEN_DEGREES = {
+    major: [
+      { degree:1, func:"T", triad:"",    seventh:"maj7", weight:5.2, label:"I" },
+      { degree:2, func:"S", triad:"m",   seventh:"m7",   weight:3.0, label:"ii" },
+      { degree:3, func:"T", triad:"m",   seventh:"m7",   weight:1.8, label:"iii" },
+      { degree:4, func:"S", triad:"",    seventh:"maj7", weight:4.2, label:"IV" },
+      { degree:5, func:"D", triad:"",    seventh:"7",    weight:5.4, label:"V" },
+      { degree:6, func:"T", triad:"m",   seventh:"m7",   weight:3.6, label:"vi" },
+      { degree:7, func:"D", triad:"dim", seventh:"m7b5", weight:1.2, label:"vii" }
+    ],
+    natural_minor: [
+      { degree:1, func:"T", triad:"m",   seventh:"m7",   weight:5.2, label:"i" },
+      { degree:2, func:"S", triad:"dim", seventh:"m7b5", weight:1.7, label:"ii" },
+      { degree:3, func:"T", triad:"",    seventh:"maj7", weight:2.7, label:"III" },
+      { degree:4, func:"S", triad:"m",   seventh:"m7",   weight:4.3, label:"iv" },
+      { degree:5, func:"D", triad:"m",   seventh:"m7",   weight:4.6, label:"v" },
+      { degree:6, func:"T", triad:"",    seventh:"maj7", weight:3.5, label:"VI" },
+      { degree:7, func:"D", triad:"",    seventh:"7",    weight:2.8, label:"VII" }
+    ]
+  };
+  const CHORD_GEN_FUNC_TRANSITIONS = {
+    T: [ {func:"T", w:0.14}, {func:"S", w:0.54}, {func:"D", w:0.32} ],
+    S: [ {func:"T", w:0.24}, {func:"S", w:0.10}, {func:"D", w:0.66} ],
+    D: [ {func:"T", w:0.72}, {func:"S", w:0.08}, {func:"D", w:0.20} ]
+  };
+  const CHORD_GEN_CADENCE = {
+    major: {
+      perfect: [5,1],
+      plagal: [4,1],
+      half: [2,5],
+      deceptive: [5,6]
+    },
+    natural_minor: {
+      perfect: [5,1],
+      plagal: [4,1],
+      half: [4,5],
+      deceptive: [5,6]
+    }
+  };
+
+  function chordGenSetInfo(text){
+    if (chordGenInfo) chordGenInfo.textContent = text;
+  }
+
+  function hasChordGenDraft(){
+    return Array.isArray(chordGenState.draft) && chordGenState.draft.length > 0;
+  }
+
+  function updateChordGenActionButtons(){
+    const hasDraft = hasChordGenDraft();
+    if (btnChordGenPreview) btnChordGenPreview.disabled = !hasDraft;
+    if (btnChordGenApply) btnChordGenApply.disabled = !hasDraft;
+    if (btnChordGenReroll) btnChordGenReroll.disabled = !chordGenState.lastSpec;
+  }
+
+  function syncChordGenBarsUI(){
+    if (!chordGenBars || !chordGenBarsLabel || !chordGenStepsLabel) return;
+    const maxBars = Math.max(1, TOTAL_BARS);
+    chordGenBars.max = String(maxBars);
+    const barsVal = clamp(Number(chordGenBars.value || maxBars), 1, maxBars);
+    chordGenBars.value = String(barsVal);
+    chordGenBarsLabel.textContent = String(barsVal);
+    chordGenStepsLabel.textContent = String(barsVal * STEPS_PER_BAR);
+  }
+
+  function getChordGenMode(){
+    return (chordGenMode?.value === "natural_minor") ? "natural_minor" : "major";
+  }
+
+  function getChordGenCadencePair(mode, cadence){
+    const m = (mode === "natural_minor") ? "natural_minor" : "major";
+    const c = CHORD_GEN_CADENCE[m];
+    return c[String(cadence || "perfect")] || c.perfect;
+  }
+
+  function getChordGenSpecFromUI(){
+    syncChordGenBarsUI();
+    const mode = getChordGenMode();
+    const key = (ROOT_PC[chordGenKey?.value] != null) ? chordGenKey.value : "C";
+    const barsVal = clamp(Number(chordGenBars?.value || TOTAL_BARS), 1, Math.max(1, TOTAL_BARS));
+    const totalSteps = clamp(barsVal * STEPS_PER_BAR, 1, TOTAL_STEPS);
+    const chordDurSteps = clamp(Number(chordGenDur?.value || 16), 1, totalSteps);
+    const cadence = ["perfect","plagal","half","deceptive"].includes(chordGenCadence?.value)
+      ? chordGenCadence.value
+      : "perfect";
+    const complexity = (chordGenComplexity?.value === "seventh") ? "seventh" : "triad";
+    return { key, mode, barsVal, totalSteps, chordDurSteps, cadence, complexity };
+  }
+
+  function buildChordGenSlots(totalSteps, chordDurSteps){
+    const slots = [];
+    const total = Math.max(1, Math.floor(totalSteps));
+    const dur = Math.max(1, Math.floor(chordDurSteps));
+    let pos = 0;
+    while (pos < total){
+      const remain = total - pos;
+      const d = Math.min(dur, remain);
+      slots.push({ startStep: pos, durSteps: d });
+      pos += d;
+    }
+    return slots;
+  }
+
+  function getChordGenDegreeTable(mode){
+    return CHORD_GEN_DEGREES[(mode === "natural_minor") ? "natural_minor" : "major"];
+  }
+
+  function getChordGenDegreeInfo(mode, degreeNum){
+    const table = getChordGenDegreeTable(mode);
+    return table.find(x => x.degree === degreeNum) || table[0];
+  }
+
+  function chooseNextHarmonyFunction(prevFunc){
+    const rows = CHORD_GEN_FUNC_TRANSITIONS[prevFunc] || CHORD_GEN_FUNC_TRANSITIONS.T;
+    const pick = weightedPick(rows, x => x.w);
+    return (pick && pick.func) ? pick.func : "T";
+  }
+
+  function generateHarmonyFunctions(n){
+    const out = [];
+    if (n <= 0) return out;
+    out.push("T");
+    for (let i = 1; i < n; i++){
+      out.push(chooseNextHarmonyFunction(out[i-1]));
+    }
+    return out;
+  }
+
+  function pickDegreeForFunction(mode, func){
+    const table = getChordGenDegreeTable(mode);
+    const pool = table.filter(x => x.func === func);
+    if (!pool.length) return table[0];
+    return weightedPick(pool, x => x.weight || 1);
+  }
+
+  function enforceCadenceOnDegrees(mode, cadence, degrees){
+    if (!degrees.length) return degrees;
+    const pair = getChordGenCadencePair(mode, cadence);
+    const last = getChordGenDegreeInfo(mode, pair[1]);
+    if (degrees.length === 1){
+      degrees[0] = last;
+      return degrees;
+    }
+    const prev = getChordGenDegreeInfo(mode, pair[0]);
+    degrees[degrees.length - 2] = prev;
+    degrees[degrees.length - 1] = last;
+    return degrees;
+  }
+
+  function chordSymbolFromDegree(spec, degreeInfo){
+    const mode = (spec.mode === "natural_minor") ? "natural_minor" : "major";
+    const pat = SCALE_PATTERNS[mode] || SCALE_PATTERNS.major;
+    const keyPc = ROOT_PC[spec.key] ?? 0;
+    const idx = clamp((degreeInfo.degree || 1) - 1, 0, pat.length - 1);
+    const rootPc = (keyPc + pat[idx]) % 12;
+    const root = NOTE_NAMES[rootPc];
+    const suffix = (spec.complexity === "seventh") ? degreeInfo.seventh : degreeInfo.triad;
+    const symbol = `${root}${suffix || ""}`;
+    if (parseChord(symbol)) return symbol;
+    const fallback = `${root}${degreeInfo.triad || ""}`;
+    if (parseChord(fallback)) return fallback;
+    return `${root}`;
+  }
+
+  function scoreChordGenCandidate(candidate, spec){
+    const degs = candidate.degrees;
+    const funcs = candidate.functions;
+    const out = candidate.chords;
+    const n = out.length;
+    if (!n) return -999999;
+    let score = 0;
+
+    const pair = getChordGenCadencePair(spec.mode, spec.cadence);
+    if (n >= 2){
+      const okCad = (degs[n-2].degree === pair[0] && degs[n-1].degree === pair[1]);
+      score += okCad ? 120 : -60;
+    }else if (degs[0].degree === pair[1]){
+      score += 30;
+    }
+
+    for (let i = 1; i < n; i++){
+      const a = funcs[i-1];
+      const b = funcs[i];
+      if (a === "T" && b === "S") score += 4.0;
+      else if (a === "S" && b === "D") score += 4.5;
+      else if (a === "D" && b === "T") score += 5.0;
+      else if (a === "T" && b === "D") score += 1.8;
+      else if (a === b) score -= 1.2;
+      else score -= 0.8;
+
+      if (degs[i].degree === degs[i-1].degree) score -= 7.0;
+      if (out[i].chordSymbol === out[i-1].chordSymbol) score -= 6.0;
+    }
+
+    const counts = new Map();
+    for (const d of degs){
+      const key = d.degree;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    const unique = counts.size;
+    score += unique * 2.2;
+    const maxAllowed = Math.max(1, Math.ceil(n * 0.45));
+    for (const c of counts.values()){
+      if (c > maxAllowed) score -= (c - maxAllowed) * 4.0;
+    }
+
+    const lastFunc = funcs[n - 1];
+    if (spec.cadence === "half"){
+      score += (lastFunc === "D") ? 8 : -8;
+    }else{
+      score += (lastFunc === "T") ? 8 : -8;
+    }
+    return score;
+  }
+
+  function generateChordGenCandidate(spec){
+    const slots = buildChordGenSlots(spec.totalSteps, spec.chordDurSteps);
+    const n = slots.length;
+    const functions = generateHarmonyFunctions(n);
+    const degrees = [];
+    for (let i = 0; i < n; i++){
+      degrees.push(pickDegreeForFunction(spec.mode, functions[i]));
+    }
+    enforceCadenceOnDegrees(spec.mode, spec.cadence, degrees);
+    for (let i = 0; i < n; i++){
+      functions[i] = degrees[i].func;
+    }
+    const chordsOut = [];
+    for (let i = 0; i < n; i++){
+      const slot = slots[i];
+      const di = degrees[i];
+      chordsOut.push({
+        startStep: slot.startStep,
+        durSteps: slot.durSteps,
+        chordSymbol: chordSymbolFromDegree(spec, di),
+        degree: di.degree,
+        func: di.func,
+        label: di.label
+      });
+    }
+    const score = scoreChordGenCandidate({ slots, degrees, functions, chords: chordsOut }, spec);
+    return { slots, degrees, functions, chords: chordsOut, score };
+  }
+
+  function findBestChordGenProgression(spec, attempts=20){
+    const k = Math.max(1, Math.floor(attempts));
+    let best = null;
+    for (let i = 0; i < k; i++){
+      const cand = generateChordGenCandidate(spec);
+      if (!best || cand.score > best.score){
+        best = cand;
+      }
+    }
+    return best;
+  }
+
+  function stopChordGenPreview(){
+    chordGenState.previewToken++;
+    if (chordGenState.previewTimer){
+      clearTimeout(chordGenState.previewTimer);
+      chordGenState.previewTimer = null;
+    }
+  }
+
+  async function previewChordGenDraft(){
+    if (!hasChordGenDraft()){
+      setStatus("Generate chords first");
+      chordGenSetInfo("No draft to preview.");
+      updateChordGenActionButtons();
+      return;
+    }
+    try{ await Tone.start(); }catch(e){}
+    stopChordGenPreview();
+    const token = chordGenState.previewToken;
+    const draft = chordGenState.draft.slice().sort((a,b)=>a.startStep-b.startStep);
+    const baseStep = draft[0].startStep;
+    const startAt = Tone.now() + 0.03;
+    const baseMidi = clamp(midiMinLimit + 28, midiMinLimit, midiMaxLimit);
+    for (const d of draft){
+      const start = startAt + stepSpanToSeconds(d.startStep - baseStep);
+      const durSec = Math.max(0.03, stepSpanToSeconds(d.durSteps) - 0.01);
+      const mids = chordToMidiTriad(d.chordSymbol, baseMidi);
+      const freqs = mids.map(m => Tone.Frequency(m, "midi").toFrequency());
+      try { markSoundActivity(); } catch(e) {}
+      try{
+        polyChord.triggerAttackRelease(freqs, durSec, start, 0.68);
+      }catch(e){}
+    }
+    const totalSteps = (draft[draft.length - 1].startStep + draft[draft.length - 1].durSteps) - baseStep;
+    const totalSec = Math.max(0.05, stepSpanToSeconds(totalSteps));
+    chordGenState.previewTimer = setTimeout(()=>{
+      if (token !== chordGenState.previewToken) return;
+      chordGenState.previewTimer = null;
+      chordGenSetInfo(`Draft ready (${draft.length} chords).`);
+    }, Math.ceil((totalSec + 0.05) * 1000));
+    setStatus(`Preview chords: ${draft.length} (${totalSec.toFixed(2)}s)`);
+    chordGenSetInfo(`Previewing draft (${draft.length} chords)...`);
+  }
+
+  function generateChordDraft(spec){
+    const best = findBestChordGenProgression(spec, 20);
+    if (!best || !best.chords.length){
+      setStatus("Chord generation failed");
+      chordGenSetInfo("No progression generated.");
+      return;
+    }
+    chordGenState.draft = best.chords.map(x => ({
+      startStep: x.startStep,
+      durSteps: x.durSteps,
+      chordSymbol: x.chordSymbol,
+      degree: x.degree,
+      func: x.func,
+      label: x.label
+    }));
+    chordGenState.lastSpec = deepClone(spec);
+    chordGenState.lastScore = best.score;
+    updateChordGenActionButtons();
+    renderAll();
+    setStatus(`Chord draft generated: ${best.chords.length} (score ${best.score.toFixed(1)})`);
+    chordGenSetInfo(`Draft ${best.chords.length} chords / ${spec.key} ${spec.mode === "major" ? "Major" : "Natural Minor"} / cadence ${spec.cadence}.`);
+  }
+
+  function generateChordDraftFromUI(){
+    const spec = getChordGenSpecFromUI();
+    stopChordGenPreview();
+    generateChordDraft(spec);
+  }
+
+  function rerollChordDraft(){
+    const spec = chordGenState.lastSpec ? deepClone(chordGenState.lastSpec) : getChordGenSpecFromUI();
+    stopChordGenPreview();
+    generateChordDraft(spec);
+  }
+
+  function applyChordGenDraft(){
+    if (!hasChordGenDraft()){
+      setStatus("No chord draft to apply");
+      chordGenSetInfo("Generate draft first.");
+      return;
+    }
+    pushUndo("Apply generated chords");
+    const applied = [];
+    for (const d of chordGenState.draft){
+      const start = clamp(Math.floor(d.startStep), 0, TOTAL_STEPS - 1);
+      const maxDur = Math.max(1, TOTAL_STEPS - start);
+      const dur = clamp(Math.floor(d.durSteps), 1, maxDur);
+      const chordSym = parseChord(d.chordSymbol) ? d.chordSymbol : "C";
+      applied.push({ start, dur, chord: chordSym });
+    }
+    chords = applied.sort((a,b)=>a.start-b.start);
+    if (cho && cho.sel && cho.sel.set) cho.sel.set.clear();
+    chordGenState.draft = [];
+    stopChordGenPreview();
+    updateChordGenActionButtons();
+    rebuildAudio();
+    renderAll();
+    setStatus(`Applied generated chords: ${chords.length}`);
+    chordGenSetInfo(`Applied ${chords.length} chords to lane.`);
+  }
+
   // ======== UNDO/REDO ========
   function pushUndo(reason="Edit"){
     undoStack.push({
@@ -2439,8 +2869,12 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     btnToggleChordTones.textContent = `Chord Tones: ${ui.toggles.chordTones ? "ON":"OFF"}`;
     btnToggleFollow.textContent = `Follow: ${ui.follow ? "ON":"OFF"}`;
     btnAutoRetune.textContent = `AutoRetune: ${ui.autoRetune ? "ON":"OFF"}`;
+    chordGenState.draft = [];
+    stopChordGenPreview();
+    updateChordGenActionButtons();
 
     syncPitchRangeDropdowns();
+    syncChordGenBarsUI();
     resizeCanvases();
     rebuildAudio();
     renderAll();
@@ -3172,9 +3606,36 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     cctx.fillRect(x0 + w - 6, y+6, 4, h-12);
   }
 
+  function drawChordDraftBlock(d){
+    const x0 = stepToX(d.startStep);
+    const w = Math.max(10, stepToX(d.startStep + d.durSteps) - x0);
+    const y = 10;
+    const h = chordCanvas.height - 20;
+    cctx.save();
+    cctx.fillStyle = "rgba(56,189,248,0.18)";
+    roundRect(cctx, x0, y, w, h, 12);
+    cctx.fill();
+    cctx.setLineDash([6,4]);
+    cctx.strokeStyle = "rgba(56,189,248,0.80)";
+    cctx.lineWidth = 1.6;
+    roundRect(cctx, x0, y, w, h, 12);
+    cctx.stroke();
+    cctx.setLineDash([]);
+    cctx.fillStyle = "rgba(235,248,255,0.96)";
+    cctx.font = "900 13px ui-sans-serif,system-ui";
+    cctx.fillText(String(d.chordSymbol || ""), x0 + 10, y + 20);
+    cctx.fillStyle = "rgba(210,235,255,0.78)";
+    cctx.font = "700 11px ui-sans-serif,system-ui";
+    cctx.fillText("draft", x0 + 10, y + h - 10);
+    cctx.restore();
+  }
+
   function renderChords(){
     drawGrid(cctx, chordCanvas.width, chordCanvas.height, false);
     for (const c of chords) drawChordBlock(c);
+    if (hasChordGenDraft()){
+      for (const d of chordGenState.draft) drawChordDraftBlock(d);
+    }
     if (cho.sel.active) drawSelectionRect(cctx, cho.sel.rect);
     if (cho.drag.ghost) drawGhostRect(cctx, cho.drag.ghost);
   }
@@ -3916,6 +4377,10 @@ function hitNote(mx,my){
     btnAutoRetune.textContent = `AutoRetune: ${ui.autoRetune ? "ON":"OFF"}`;
     setStatus("AutoRetune toggled");
   });
+  if (btnChordGenGenerate) btnChordGenGenerate.addEventListener("click", generateChordDraftFromUI);
+  if (btnChordGenPreview) btnChordGenPreview.addEventListener("click", previewChordGenDraft);
+  if (btnChordGenApply) btnChordGenApply.addEventListener("click", applyChordGenDraft);
+  if (btnChordGenReroll) btnChordGenReroll.addEventListener("click", rerollChordDraft);
   btnRetune.addEventListener("click", retuneAllNotesToScale);
   btnRandomizeSelectedPitch.addEventListener("click", randomizeSelectedNotesPitch);
   btnRandomizeStructure.addEventListener("click", randomizeNotesStructure);
@@ -3934,6 +4399,9 @@ function hitNote(mx,my){
   randBarsSpan.addEventListener("input", ()=>{
     randBarsSpanLabel.textContent = randBarsSpan.value;
   });
+  if (chordGenBars){
+    chordGenBars.addEventListener("input", syncChordGenBarsUI);
+  }
   randDensity.addEventListener("input", ()=>{
     randDensityLabel.textContent = randDensity.value;
   });
@@ -3992,6 +4460,7 @@ function hitNote(mx,my){
     resizeCanvases();
     rebuildAudio();
     renderAll();
+    syncChordGenBarsUI();
     setStatus(`Bars: ${TOTAL_BARS}`);
   });
 
@@ -4717,7 +5186,7 @@ renderAll();
   function exportSong(){
     return {
       format: "piano-roll-song",
-      version: 5,
+      version: 6,
       meta: { title:"My Song", author:"You", created:new Date().toISOString() },
       transport: { bpm: Math.round(Tone.Transport.bpm.value), timeSignature:[4,4], bars:TOTAL_BARS, stepsPerBar:STEPS_PER_BAR },
       scale: { root: scaleRoot.value, type: scaleType.value },
@@ -4752,6 +5221,14 @@ renderAll();
             repeat: Number(randWRepeat?.value || 6),
             endStable: Number(randWEndStable?.value || 8)
           }
+        },
+        chordGen: {
+          key: chordGenKey?.value || "C",
+          mode: chordGenMode?.value || "major",
+          bars: Number(chordGenBars?.value || TOTAL_BARS),
+          chordDurSteps: Number(chordGenDur?.value || 16),
+          cadence: chordGenCadence?.value || "perfect",
+          complexity: chordGenComplexity?.value || "triad"
         }
       }
     };
@@ -4829,6 +5306,19 @@ renderAll();
       randWRepeatLabel.textContent = randWRepeat.value;
       randWEndStableLabel.textContent = randWEndStable.value;
     }
+    if (data.ui?.chordGen){
+      const cg = data.ui.chordGen;
+      if (typeof cg.key === "string" && ROOT_PC[cg.key] != null) chordGenKey.value = cg.key;
+      if (typeof cg.mode === "string") chordGenMode.value = (cg.mode === "natural_minor") ? "natural_minor" : "major";
+      if (typeof cg.bars === "number") chordGenBars.value = String(clamp(cg.bars, 1, Math.max(1, TOTAL_BARS)));
+      if (typeof cg.chordDurSteps === "number") chordGenDur.value = String(clamp(cg.chordDurSteps, 1, 32));
+      if (typeof cg.cadence === "string" && ["perfect","plagal","half","deceptive"].includes(cg.cadence)) chordGenCadence.value = cg.cadence;
+      if (typeof cg.complexity === "string") chordGenComplexity.value = (cg.complexity === "seventh") ? "seventh" : "triad";
+    }
+    syncChordGenBarsUI();
+    chordGenState.draft = [];
+    stopChordGenPreview();
+    updateChordGenActionButtons();
     btnToggleDrums.textContent = `Drums: ${ui.toggles.drums ? "ON":"OFF"}`;
     btnToggleChords.textContent = `Chords: ${ui.toggles.chords ? "ON":"OFF"}`;
     btnToggleAssist.textContent = `Assist: ${ui.toggles.assist ? "ON":"OFF"}`;
@@ -4917,6 +5407,8 @@ renderAll();
     randIntNearLabel.textContent = randIntNear.value;
     randIntMidLabel.textContent = randIntMid.value;
     randIntFarLabel.textContent = randIntFar.value;
+    if (chordGenKey && ROOT_PC[scaleRoot.value] != null) chordGenKey.value = scaleRoot.value;
+    if (chordGenMode) chordGenMode.value = (scaleType.value === "natural_minor") ? "natural_minor" : "major";
     const storedMaster = Number(localStorage.getItem("masterVolumePct"));
     const initialMaster = Number.isFinite(storedMaster) ? storedMaster : Number(masterVol.value || 85);
     setMasterVolumePct(initialMaster, false);
@@ -4940,6 +5432,10 @@ renderAll();
     btnToggleFollow.textContent = `Follow: ${ui.follow ? "ON":"OFF"}`;
     btnAutoRetune.textContent = `AutoRetune: ${ui.autoRetune ? "ON":"OFF"}`;
     btnStepInput.textContent = "Step Input: OFF";
+    chordGenState.draft = [];
+    syncChordGenBarsUI();
+    updateChordGenActionButtons();
+    chordGenSetInfo("Generate a draft progression, then Preview/Apply.");
     updatePitchUI();
 
     rebuildAudio();
