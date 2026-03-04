@@ -537,6 +537,10 @@
             <input id="randDensity" type="range" min="2" max="16" value="8" style="width:110px">
             <span id="randDensityLabel">8</span>
           </label>
+          <label class="pill">Dur Rand
+            <input id="randDurVar" type="range" min="0" max="10" value="3" style="width:110px">
+            <span id="randDurVarLabel">3</span>
+          </label>
           <label class="pill">Pitch Span
             <input id="randPitchSpan" type="range" min="6" max="48" value="24" style="width:110px">
             <span id="randPitchSpanLabel">24 st</span>
@@ -833,6 +837,8 @@
   const randBarsSpanLabel = document.getElementById("randBarsSpanLabel");
   const randDensity = document.getElementById("randDensity");
   const randDensityLabel = document.getElementById("randDensityLabel");
+  const randDurVar = document.getElementById("randDurVar");
+  const randDurVarLabel = document.getElementById("randDurVarLabel");
   const randPitchSpan = document.getElementById("randPitchSpan");
   const randPitchSpanLabel = document.getElementById("randPitchSpanLabel");
   const randIntNear = document.getElementById("randIntNear");
@@ -2136,6 +2142,27 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     return clamp(Number(randPitchSpan?.value || 24), 6, 48);
   }
 
+  function getPhraseDurationRandomness(){
+    return clamp(Number(randDurVar?.value || 0), 0, 10);
+  }
+
+  function chooseDurationWithRandomness(baseDur, maxDur, snap, randomness){
+    const maxUnits = Math.max(1, Math.floor((maxDur / snap) + 1e-9));
+    const baseUnits = clamp(Math.round(baseDur / snap), 1, maxUnits);
+    if (maxUnits <= 1 || randomness <= 0){
+      return baseUnits * snap;
+    }
+    const r = clamp(randomness / 10, 0, 1);
+    const cands = [];
+    for (let u = 1; u <= maxUnits; u++) cands.push(u);
+    const picked = weightedPick(cands, (u)=>{
+      const dist = Math.abs(u - baseUnits);
+      const peaked = Math.exp(-dist / (0.38 + r * 2.4));
+      return ((1 - r) * peaked) + (r * 1.0);
+    });
+    return clamp((picked || baseUnits) * snap, snap, maxDur);
+  }
+
   function chooseRhythmTemplateId(density){
     const v = String(randRhythmTemplate?.value || "auto");
     if (v !== "auto" && RHYTHM_TEMPLATES[v]) return v;
@@ -2147,6 +2174,7 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
 
   function buildRhythmEventsFromTemplate(cfg, snap){
     const density = clamp(Number(randDensity?.value || 8), 2, 16);
+    const durRand = getPhraseDurationRandomness();
     const templateId = chooseRhythmTemplateId(density);
     const base = RHYTHM_TEMPLATES[templateId] || RHYTHM_TEMPLATES.straight8;
     const keepProb = clamp(density / 16, 0.12, 1);
@@ -2187,7 +2215,9 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     }
     for (let i = 0; i < events.length; i++){
       const nextStep = (i + 1 < events.length) ? events[i+1].step : cfg.end;
-      events[i].dur = clamp(Math.min(events[i].dur, nextStep - events[i].step), snap, Math.max(snap, cfg.end - events[i].step));
+      const maxDur = Math.max(snap, nextStep - events[i].step);
+      const baseDur = clamp(Math.min(events[i].dur, maxDur), snap, maxDur);
+      events[i].dur = chooseDurationWithRandomness(baseDur, maxDur, snap, durRand);
     }
     return { templateId, events };
   }
@@ -4405,6 +4435,9 @@ function hitNote(mx,my){
   randDensity.addEventListener("input", ()=>{
     randDensityLabel.textContent = randDensity.value;
   });
+  randDurVar.addEventListener("input", ()=>{
+    randDurVarLabel.textContent = randDurVar.value;
+  });
   randPitchSpan.addEventListener("input", ()=>{
     randPitchSpanLabel.textContent = `${randPitchSpan.value} st`;
   });
@@ -5186,7 +5219,7 @@ renderAll();
   function exportSong(){
     return {
       format: "piano-roll-song",
-      version: 6,
+      version: 7,
       meta: { title:"My Song", author:"You", created:new Date().toISOString() },
       transport: { bpm: Math.round(Tone.Transport.bpm.value), timeSignature:[4,4], bars:TOTAL_BARS, stepsPerBar:STEPS_PER_BAR },
       scale: { root: scaleRoot.value, type: scaleType.value },
@@ -5207,6 +5240,7 @@ renderAll();
           rhythmTemplate: randRhythmTemplate?.value || "auto",
           barsSpan: Number(randBarsSpan.value || 4),
           density: Number(randDensity.value || 8),
+          durVar: Number(randDurVar?.value || 3),
           pitchSpan: Number(randPitchSpan?.value || 24),
           intervalWeights: {
             near: Number(randIntNear.value || 6),
@@ -5277,6 +5311,7 @@ renderAll();
       if (typeof data.ui.randomize.rhythmTemplate === "string") randRhythmTemplate.value = data.ui.randomize.rhythmTemplate;
       if (typeof data.ui.randomize.barsSpan === "number") randBarsSpan.value = String(clamp(data.ui.randomize.barsSpan, 1, 16));
       if (typeof data.ui.randomize.density === "number") randDensity.value = String(clamp(data.ui.randomize.density, 2, 16));
+      if (typeof data.ui.randomize.durVar === "number") randDurVar.value = String(clamp(data.ui.randomize.durVar, 0, 10));
       if (typeof data.ui.randomize.pitchSpan === "number") randPitchSpan.value = String(clamp(data.ui.randomize.pitchSpan, 6, 48));
       if (data.ui.randomize.intervalWeights){
         const iw = data.ui.randomize.intervalWeights;
@@ -5295,6 +5330,7 @@ renderAll();
       }
       randBarsSpanLabel.textContent = randBarsSpan.value;
       randDensityLabel.textContent = randDensity.value;
+      randDurVarLabel.textContent = randDurVar.value;
       randPitchSpanLabel.textContent = `${randPitchSpan.value} st`;
       randIntNearLabel.textContent = randIntNear.value;
       randIntMidLabel.textContent = randIntMid.value;
@@ -5403,6 +5439,7 @@ renderAll();
     zoomLabel.textContent = zoom.value;
     randBarsSpanLabel.textContent = randBarsSpan.value;
     randDensityLabel.textContent = randDensity.value;
+    randDurVarLabel.textContent = randDurVar.value;
     randPitchSpanLabel.textContent = `${randPitchSpan.value} st`;
     randIntNearLabel.textContent = randIntNear.value;
     randIntMidLabel.textContent = randIntMid.value;
