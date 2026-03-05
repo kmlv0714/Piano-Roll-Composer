@@ -8,12 +8,13 @@
   <title>Piano Roll Composer - Scroll Fix + Follow Fix + Pitch Wheel + Compact Chords</title>
   <script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
   <style>
-    :root{
+:root{
       --bg:#0b0f18;
       --border:#22304a;
       --text:#dbe7ff;
       --muted:#8aa0c7;
       --acc:#7c3aed;
+      --tab-panel-h:110px;
       --shadow: 0 12px 30px rgba(0,0,0,.35);
       --r:16px;
     }
@@ -208,7 +209,7 @@
     .rulerRow{display:flex;gap:10px;align-items:stretch;margin-bottom:10px;}
     .chordRow{display:flex;gap:10px;align-items:stretch;}
     .chordRow #chordScroll{flex:1;}
-    .chordPad{height: var(--chH, 160px);} 
+    .chordPad{height: var(--chH, 80px);} 
 
     .pitchRulerPad{width:100px;flex:0 0 100px;height:34px;border-radius:14px;border:1px solid var(--border);
       background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));}
@@ -265,18 +266,18 @@
 
     .chordPickerOverlay{
       position:fixed;
-      inset:0;
+      inset:auto;
+      top:86px;
+      right:12px;
       z-index:12000;
       display:none;
-      align-items:center;
-      justify-content:center;
-      background:rgba(3,8,18,0.58);
-      backdrop-filter: blur(1px);
+      background:none;
+      backdrop-filter:none;
     }
-    .chordPickerOverlay.show{display:flex;}
+    .chordPickerOverlay.show{display:block;}
     .chordPickerWindow{
-      width:min(760px, calc(100vw - 24px));
-      max-height:calc(100vh - 24px);
+      width:min(500px, calc(100vw - 24px));
+      max-height:calc(100vh - 106px);
       overflow:auto;
       padding:12px;
       border:1px solid var(--border);
@@ -380,6 +381,223 @@
   pointer-events: none; /* let the dock handle drag */
 }
 
+/* ===== One-screen composer layout (1920x1080 target) ===== */
+html, body{height:100%}
+body{
+  overflow:hidden;
+}
+.wrap{
+  max-width:none;
+  width:100vw;
+  height:100vh;
+  margin:0;
+  padding:10px;
+  display:grid;
+  grid-template-rows:auto minmax(0,1fr) auto;
+  gap:10px;
+}
+.top{
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:10px;
+  align-items:stretch;
+  min-height:0;
+}
+.toolbar{
+  min-width:0;
+  padding:10px;
+}
+.transportFixed,
+.tabBar,
+.tabPanel{
+  flex-wrap:wrap;
+  align-content:flex-start;
+  align-items:flex-start;
+  gap:8px;
+}
+.transportFixed,
+.tabBar{
+  flex-wrap:nowrap;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:thin;
+}
+.transportFixed > *,
+.tabBar > *{
+  flex:0 0 auto;
+}
+.tabPanel > *{
+  flex:0 0 auto;
+}
+.tabPanels{
+  min-height:var(--tab-panel-h);
+  height:var(--tab-panel-h);
+  max-height:var(--tab-panel-h);
+  padding:8px;
+  overflow:hidden;
+}
+.tabPanel{
+  width:100%;
+  min-height:calc(var(--tab-panel-h) - 16px);
+}
+.row{
+  margin-top:0;
+  display:grid;
+  grid-template-rows:minmax(0,1fr) auto;
+  gap:10px;
+  min-height:0;
+}
+.mainLayout{
+  min-height:0;
+  height:100%;
+  grid-template-columns:320px minmax(0,1fr);
+}
+.mainLayout.sidebar-collapsed{
+  grid-template-columns:56px minmax(0,1fr);
+}
+.leftDock{
+  min-height:0;
+  display:block;
+}
+.phraseCard{
+  min-height:0;
+  height:100%;
+  overflow:hidden;
+}
+.phraseCard.collapsed .phraseBody{
+  display:none;
+}
+.sidebarToggle{
+  min-width:76px;
+  justify-content:center;
+}
+.panel{
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+}
+.canvasWrap{
+  min-height:0;
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.rulerRow{margin-bottom:0}
+.melodyFlex{
+  flex:1;
+  min-height:0;
+}
+#melodyScroll{
+  flex:1;
+  min-height:0;
+}
+#melodyCanvas{
+  height:100%;
+}
+.ops{
+  min-height:0;
+  max-height:220px;
+}
+.opsToggle{
+  min-width:82px;
+  justify-content:center;
+}
+.status{
+  margin-top:0;
+  width:fit-content;
+  max-width:520px;
+  justify-self:start;
+  padding:8px 10px;
+  font-size:12px;
+  gap:4px;
+}
+.status .small{
+  display:none;
+}
+
+/* Chord picker: non-modal floating panel */
+.chordPickerOverlay{
+  position:fixed;
+  inset:auto;
+  top:86px;
+  left:50%;
+  right:auto;
+  transform:translateX(-50%);
+  z-index:12000;
+  display:none;
+  background:none;
+  backdrop-filter:none;
+}
+.chordPickerOverlay.show{
+  display:block;
+}
+.chordPickerWindow{
+  width:min(760px, calc(100vw - 40px));
+  max-height:calc(100vh - 126px);
+  background:
+    linear-gradient(180deg, rgba(7,11,20,.98), rgba(4,8,16,.98));
+  border-color:#35517d;
+  box-shadow:0 20px 44px rgba(0,0,0,.58);
+}
+.opsPanel{
+  position:fixed;
+  top:86px;
+  right:12px;
+  z-index:11900;
+  width:min(420px, calc(100vw - 24px));
+  max-height:calc(100vh - 106px);
+  display:none;
+  overflow:auto;
+}
+.opsPanel.show{
+  display:block;
+}
+
+@media (max-width: 1280px){
+  body{overflow:auto;}
+  .wrap{
+    height:auto;
+    min-height:100vh;
+    grid-template-rows:auto auto auto;
+  }
+  .top{
+    grid-template-columns:1fr;
+  }
+  .row{
+    grid-template-rows:auto auto;
+  }
+  .mainLayout,
+  .mainLayout.sidebar-collapsed{
+    grid-template-columns:1fr;
+    height:auto;
+  }
+  .phraseCard.collapsed .phraseBody{
+    display:flex;
+  }
+  .sidebarToggle{
+    display:none;
+  }
+  .chordPickerOverlay{
+    top:72px;
+    left:50%;
+    right:auto;
+    transform:translateX(-50%);
+  }
+  .opsPanel{
+    top:72px;
+    right:8px;
+  }
+  .tabPanels{
+    min-height:auto;
+    height:auto;
+    max-height:none;
+  }
+  .tabPanel{
+    min-height:0;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -399,6 +617,12 @@
           <input id="masterVol" type="range" min="0" max="100" value="85" style="width:140px">
           <span id="masterVolLabel">85%</span>
         </label>
+        <button id="btnSave" class="btn">Save JSON</button>
+        <label class="btn" style="gap:10px;cursor:pointer;">
+          Load JSON
+          <input id="fileLoad" type="file" accept="application/json" style="display:none">
+        </label>
+        <button id="btnToggleOps" class="btn" type="button">Operations</button>
       </div>
 
       <div class="tabBar">
@@ -474,20 +698,24 @@
               <option value="natural_minor">Natural Minor</option>
             </select>
           </label>
-          <label class="pill">Bars
+          <label class="pill">Total Bars
             <input id="chordGenBars" type="range" min="1" max="16" value="16" style="width:120px">
             <span id="chordGenBarsLabel">16</span>
           </label>
           <label class="pill">Steps
             <span id="chordGenStepsLabel">256</span>
           </label>
-          <label class="pill">Chord Dur
+          <label class="pill">Chord Dur (Bars)
             <select id="chordGenDur">
+              <option value="0.25">1/4</option>
+              <option value="0.5">1/2</option>
+              <option value="1" selected>1</option>
+              <option value="2">2</option>
               <option value="4">4</option>
-              <option value="8">8</option>
-              <option value="16" selected>16</option>
-              <option value="32">32</option>
             </select>
+          </label>
+          <label class="pill">Chord Dur Steps
+            <span id="chordGenDurStepsLabel">16</span>
           </label>
           <label class="pill">Cadence
             <select id="chordGenCadence">
@@ -618,43 +846,36 @@
       </div>
     </div>
 
-    <div class="card right">
-            <button id="btnSave" class="btn">Save JSON</button>
-      <label class="btn" style="gap:10px;cursor:pointer;">
-        Load JSON
-        <input id="fileLoad" type="file" accept="application/json" style="display:none">
-      </label>
-      <div class="pill small" style="flex:1;justify-content:center;">
-        Mouse wheel scroll works over the piano roll.
-      </div>
-    </div>
   </div>
 
   <div class="row">
-    <div class="mainLayout">
-      <div class="card phraseCard">
-        <div class="panelHeader">
-          <div class="title">Phrase Stocker <span class="badge">Library</span></div>
-        </div>
-        <div class="phraseBody">
-          <div class="phraseToolbar">
-            <button id="btnPhraseStock" class="btn good">Stock</button>
-            <button id="btnPhraseCopy" class="btn">Copy</button>
-            <button id="btnPhraseDelete" class="btn">Delete</button>
+    <div id="mainLayout" class="mainLayout">
+      <div id="leftDock" class="leftDock">
+        <div id="phraseCard" class="card phraseCard">
+          <div class="panelHeader">
+            <div class="title">Phrase Stocker <span class="badge">Library</span></div>
+            <button id="btnToggleSidebar" class="btn sidebarToggle" type="button">Hide</button>
           </div>
-          <div class="phraseNameLine">
-            <span class="small">Name</span>
-            <input id="phraseNameInput" class="phraseNameInput" type="text" placeholder="Select a phrase">
+          <div class="phraseBody">
+            <div class="phraseToolbar">
+              <button id="btnPhraseStock" class="btn good">Stock</button>
+              <button id="btnPhraseCopy" class="btn">Copy</button>
+              <button id="btnPhraseDelete" class="btn">Delete</button>
+            </div>
+            <div class="phraseNameLine">
+              <span class="small">Name</span>
+              <input id="phraseNameInput" class="phraseNameInput" type="text" placeholder="Select a phrase">
+            </div>
+            <div id="phraseList" class="phraseList"></div>
+            <div class="phraseStorageLine">
+              <button id="btnPhraseSave" class="btn">Save Stocker</button>
+              <label class="btn" style="cursor:pointer;">
+                Load Stocker
+                <input id="filePhraseLoad" type="file" accept="application/json" style="display:none">
+              </label>
+            </div>
+            <div id="phraseInfo" class="small">Copy notes in piano roll, then press Stock.</div>
           </div>
-          <div id="phraseList" class="phraseList"></div>
-          <div class="phraseStorageLine">
-            <button id="btnPhraseSave" class="btn">Save Stocker</button>
-            <label class="btn" style="cursor:pointer;">
-              Load Stocker
-              <input id="filePhraseLoad" type="file" accept="application/json" style="display:none">
-            </label>
-          </div>
-          <div id="phraseInfo" class="small">Copy notes in piano roll, then press Stock.</div>
         </div>
       </div>
 
@@ -687,24 +908,12 @@
           <div class="chordRow">
             <div class="pitchRulerPad chordPad"></div>
             <div id="chordScroll" class="scrollX">
-              <canvas id="chordCanvas" height="96"></canvas>
+              <canvas id="chordCanvas" height="48"></canvas>
             </div>
           </div>
         </div>
       </div>
     </div>
-
-  <div class="card ops">
-    <div class="panelHeader">
-      <div class="title">Operations <span class="badge">Tips</span></div>
-    </div>
-    <div class="opsBody">
-      <div class="opline"><b>Horizontal Scroll:</b> Drag empty area in the roll, or drag on the ruler.</div>
-      <div class="opline"><b>Playback:</b> Press <span class="k">Space</span> to Play/Stop. During playback, Follow mode auto-scrolls.</div>
-      <div class="opline"><b>Notes:</b> <span class="k">Click</span> to place at step cursor, <span class="k">Drag</span> to move/resize, <span class="k">Wheel</span> for velocity, <span class="k">Right Click</span> to delete.</div>
-      <div class="opline"><b>Chords:</b> <span class="k">Drag</span> to move/resize, <span class="k">Wheel</span> to switch chord, <span class="k">Right Click</span> to delete, <span class="k">Long Press</span> to open chord picker.</div>
-    </div>
-  </div>
 
 <div class="card status">
     <div id="statusLeft">Status: <b>Ready</b></div>
@@ -713,7 +922,7 @@
 </div>
 
   <div id="chordPickerOverlay" class="chordPickerOverlay" aria-hidden="true">
-    <div id="chordPickerWindow" class="card chordPickerWindow" role="dialog" aria-modal="true" aria-label="Chord Picker">
+    <div id="chordPickerWindow" class="card chordPickerWindow" role="region" aria-label="Chord Picker">
       <div class="chordPickerHead">
         <div class="chordPickerTitle">Chord Picker</div>
         <div id="chordPickerPreview" class="chordPickerPreview">--</div>
@@ -734,6 +943,19 @@
         <button id="btnChordPickerApply" class="btn good">Apply</button>
         <button id="btnChordPickerClose" class="btn">Close</button>
       </div>
+    </div>
+  </div>
+
+  <div id="opsPanel" class="card ops opsPanel" aria-hidden="true">
+    <div class="panelHeader">
+      <div class="title">Operations <span class="badge">Tips</span></div>
+      <button id="btnOpsPanelClose" class="btn opsToggle" type="button">Close</button>
+    </div>
+    <div class="opsBody">
+      <div class="opline"><b>Horizontal Scroll:</b> Drag empty area in the roll, or drag on the ruler.</div>
+      <div class="opline"><b>Playback:</b> Press <span class="k">Space</span> to Play/Stop. During playback, Follow mode auto-scrolls.</div>
+      <div class="opline"><b>Notes:</b> <span class="k">Click</span> to place at step cursor, <span class="k">Drag</span> to move/resize, <span class="k">Wheel</span> for velocity, <span class="k">Right Click</span> to delete.</div>
+      <div class="opline"><b>Chords:</b> <span class="k">Drag</span> to move/resize, <span class="k">Wheel</span> to switch chord, <span class="k">Right Click</span> to delete, <span class="k">Long Press</span> to open chord picker.</div>
     </div>
   </div>
 
@@ -796,6 +1018,16 @@
   const phraseNameInput = document.getElementById("phraseNameInput");
   const phraseList = document.getElementById("phraseList");
   const phraseInfo = document.getElementById("phraseInfo");
+  const mainLayout = document.getElementById("mainLayout");
+  const phraseCard = document.getElementById("phraseCard");
+  const btnToggleSidebar = document.getElementById("btnToggleSidebar");
+  const btnToggleOps = document.getElementById("btnToggleOps");
+  const opsPanel = document.getElementById("opsPanel");
+  const btnOpsPanelClose = document.getElementById("btnOpsPanelClose");
+  const composerPanel = document.querySelector(".card.panel");
+  const composerPanelHeader = composerPanel ? composerPanel.querySelector(".panelHeader") : null;
+  const composerCanvasWrap = composerPanel ? composerPanel.querySelector(".canvasWrap") : null;
+  const composerSubHeader = composerCanvasWrap ? composerCanvasWrap.querySelector(".subHeader") : null;
 
   const btnToggleDrums = document.getElementById("btnToggleDrums");
   const btnToggleChords = document.getElementById("btnToggleChords");
@@ -824,6 +1056,7 @@
   const chordGenBarsLabel = document.getElementById("chordGenBarsLabel");
   const chordGenStepsLabel = document.getElementById("chordGenStepsLabel");
   const chordGenDur = document.getElementById("chordGenDur");
+  const chordGenDurStepsLabel = document.getElementById("chordGenDurStepsLabel");
   const chordGenCadence = document.getElementById("chordGenCadence");
   const chordGenComplexity = document.getElementById("chordGenComplexity");
   const btnChordGenGenerate = document.getElementById("btnChordGenGenerate");
@@ -876,6 +1109,7 @@
 
   const CHORD_LONG_PRESS_MS = 450;
   const CHORD_LONG_PRESS_MOVE_PX = 6;
+  const SIDEBAR_COLLAPSE_KEY = "prcSidebarCollapsed";
 
   function setTopTab(tabName){
     for (const btn of tabButtons){
@@ -885,6 +1119,29 @@
     for (const panel of tabPanels){
       const active = panel.dataset.tabPanel === tabName;
       panel.classList.toggle("active", active);
+    }
+  }
+
+  let sidebarCollapsed = false;
+  let opsPanelOpen = false;
+
+  function applySidebarCollapsedState(){
+    if (!mainLayout || !phraseCard) return;
+    mainLayout.classList.toggle("sidebar-collapsed", sidebarCollapsed);
+    phraseCard.classList.toggle("collapsed", sidebarCollapsed);
+    if (btnToggleSidebar) btnToggleSidebar.textContent = sidebarCollapsed ? "Show" : "Hide";
+    try{ localStorage.setItem(SIDEBAR_COLLAPSE_KEY, sidebarCollapsed ? "1" : "0"); }catch(e){}
+  }
+
+  function setOpsPanelOpen(nextOpen){
+    opsPanelOpen = !!nextOpen;
+    if (opsPanel){
+      opsPanel.classList.toggle("show", opsPanelOpen);
+      opsPanel.setAttribute("aria-hidden", opsPanelOpen ? "false" : "true");
+    }
+    if (btnToggleOps){
+      btnToggleOps.classList.toggle("primary", opsPanelOpen);
+      btnToggleOps.textContent = "Operations";
     }
   }
 
@@ -898,7 +1155,7 @@
   let ui = {
     pxPerStep: 18,
     melodyH: 520,
-    chordH: 96,      // compact!
+    chordH: 48,      // compact!
     follow: true,
     autoRetune: true,
     toggles: { drums:true, chords:true, assist:true, chordTones:true }
@@ -1541,7 +1798,27 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
   function stepToX(step){ return step * ui.pxPerStep; }
   function xToStep(x){ return x / ui.pxPerStep; }
 
-  function resizeCanvases(){
+  function fitRollHeightsToViewport(){
+    if (!composerCanvasWrap || !composerPanel) return;
+    const panelH = composerPanel.clientHeight;
+    if (!panelH || panelH < 280) return;
+    const panelHeaderH = composerPanelHeader ? composerPanelHeader.offsetHeight : 44;
+    const wrapPad = 24; // .canvasWrap top+bottom paddings
+    const hostH = panelH - panelHeaderH - wrapPad;
+    if (!hostH || hostH < 240) return;
+    const rulerH = 34;
+    const headerH = composerSubHeader ? composerSubHeader.offsetHeight : 40;
+    const gapBudget = 46;
+    const chordTarget = clamp(Math.round(hostH * 0.125), 60, 120);
+    const melodyTarget = hostH - rulerH - headerH - chordTarget - gapBudget;
+    ui.chordH = chordTarget;
+    ui.melodyH = clamp(melodyTarget, 210, 1400);
+  }
+
+  function resizeCanvases(refitHeights=true){
+    if (refitHeights){
+      fitRollHeightsToViewport();
+    }
     rulerCanvas.height = 34;
     melodyCanvas.height = ui.melodyH;
     chordCanvas.height  = ui.chordH;
@@ -1783,11 +2060,6 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     }
     if (btnChordPickerClose){
       btnChordPickerClose.addEventListener("click", closeChordPicker);
-    }
-    if (chordPickerOverlay){
-      chordPickerOverlay.addEventListener("click", (e)=>{
-        if (e.target === chordPickerOverlay) closeChordPicker();
-      });
     }
     window.addEventListener("keydown", (e)=>{
       if (e.key === "Escape" && chordPickerState.open){
@@ -2539,6 +2811,8 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     return Array.isArray(chordGenState.draft) && chordGenState.draft.length > 0;
   }
 
+  const CHORD_GEN_DUR_BAR_OPTIONS = [0.25, 0.5, 1, 2, 4];
+
   function updateChordGenActionButtons(){
     const hasDraft = hasChordGenDraft();
     if (btnChordGenPreview) btnChordGenPreview.disabled = !hasDraft;
@@ -2546,14 +2820,49 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     if (btnChordGenReroll) btnChordGenReroll.disabled = !chordGenState.lastSpec;
   }
 
+  function parseChordGenDurBars(){
+    const raw = Number(chordGenDur?.value ?? 1);
+    if (!Number.isFinite(raw)) return 1;
+    return clamp(raw, CHORD_GEN_DUR_BAR_OPTIONS[0], CHORD_GEN_DUR_BAR_OPTIONS[CHORD_GEN_DUR_BAR_OPTIONS.length - 1]);
+  }
+
+  function chordGenDurBarsToSteps(durBars, totalSteps){
+    const stepTotal = Math.max(1, Math.floor(totalSteps || TOTAL_STEPS));
+    const v = Number(durBars);
+    if (!Number.isFinite(v)) return Math.min(STEPS_PER_BAR, stepTotal);
+    const raw = Math.round(v * STEPS_PER_BAR);
+    return clamp(raw, 1, stepTotal);
+  }
+
+  function setChordGenDurBarsValue(durBars){
+    if (!chordGenDur) return;
+    const v = Number(durBars);
+    if (!Number.isFinite(v)) return;
+    let best = CHORD_GEN_DUR_BAR_OPTIONS[0];
+    let bestDist = Math.abs(v - best);
+    for (let i = 1; i < CHORD_GEN_DUR_BAR_OPTIONS.length; i++){
+      const cand = CHORD_GEN_DUR_BAR_OPTIONS[i];
+      const dist = Math.abs(v - cand);
+      if (dist < bestDist){
+        best = cand;
+        bestDist = dist;
+      }
+    }
+    chordGenDur.value = String(best);
+  }
+
   function syncChordGenBarsUI(){
     if (!chordGenBars || !chordGenBarsLabel || !chordGenStepsLabel) return;
     const maxBars = Math.max(1, TOTAL_BARS);
     chordGenBars.max = String(maxBars);
     const barsVal = clamp(Number(chordGenBars.value || maxBars), 1, maxBars);
+    const totalSteps = barsVal * STEPS_PER_BAR;
+    const chordDurBars = parseChordGenDurBars();
+    const chordDurSteps = chordGenDurBarsToSteps(chordDurBars, totalSteps);
     chordGenBars.value = String(barsVal);
     chordGenBarsLabel.textContent = String(barsVal);
-    chordGenStepsLabel.textContent = String(barsVal * STEPS_PER_BAR);
+    chordGenStepsLabel.textContent = String(totalSteps);
+    if (chordGenDurStepsLabel) chordGenDurStepsLabel.textContent = String(chordDurSteps);
   }
 
   function getChordGenMode(){
@@ -2572,12 +2881,13 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     const key = (ROOT_PC[chordGenKey?.value] != null) ? chordGenKey.value : "C";
     const barsVal = clamp(Number(chordGenBars?.value || TOTAL_BARS), 1, Math.max(1, TOTAL_BARS));
     const totalSteps = clamp(barsVal * STEPS_PER_BAR, 1, TOTAL_STEPS);
-    const chordDurSteps = clamp(Number(chordGenDur?.value || 16), 1, totalSteps);
+    const chordDurBars = parseChordGenDurBars();
+    const chordDurSteps = chordGenDurBarsToSteps(chordDurBars, totalSteps);
     const cadence = ["perfect","plagal","half","deceptive"].includes(chordGenCadence?.value)
       ? chordGenCadence.value
       : "perfect";
     const complexity = (chordGenComplexity?.value === "seventh") ? "seventh" : "triad";
-    return { key, mode, barsVal, totalSteps, chordDurSteps, cadence, complexity };
+    return { key, mode, barsVal, totalSteps, chordDurBars, chordDurSteps, cadence, complexity };
   }
 
   function buildChordGenSlots(totalSteps, chordDurSteps){
@@ -2755,6 +3065,41 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     }
   }
 
+  function getChordGenPlacementBaseStep(){
+    return clamp(quant(isPlaying ? (playStepFloat % TOTAL_STEPS) : stepCursor), 0, TOTAL_STEPS-1);
+  }
+
+  function getChordGenDraftSpanSteps(){
+    if (!hasChordGenDraft()) return 0;
+    const draft = chordGenState.draft.slice().sort((a,b)=>a.startStep-b.startStep);
+    const draftBase = Math.floor(draft[0]?.startStep || 0);
+    return Math.max(1, Math.floor((draft[draft.length - 1].startStep + draft[draft.length - 1].durSteps) - draftBase));
+  }
+
+  function buildPlacedChordGenDraft(baseStep){
+    if (!hasChordGenDraft()) return [];
+    const placed = [];
+    const draft = chordGenState.draft.slice().sort((a,b)=>a.startStep-b.startStep);
+    const draftBase = Math.floor(draft[0]?.startStep || 0);
+    for (const d of draft){
+      const rel = Math.floor(d.startStep - draftBase);
+      const startStep = baseStep + rel;
+      if (startStep < 0 || startStep >= TOTAL_STEPS) continue;
+      const maxDur = Math.max(1, TOTAL_STEPS - startStep);
+      const durSteps = clamp(Math.floor(d.durSteps), 1, maxDur);
+      const chordSymbol = parseChord(d.chordSymbol) ? d.chordSymbol : "C";
+      placed.push({
+        startStep,
+        durSteps,
+        chordSymbol,
+        degree: d.degree,
+        func: d.func,
+        label: d.label
+      });
+    }
+    return placed;
+  }
+
   async function previewChordGenDraft(){
     if (!hasChordGenDraft()){
       setStatus("Generate chords first");
@@ -2765,12 +3110,17 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     try{ await Tone.start(); }catch(e){}
     stopChordGenPreview();
     const token = chordGenState.previewToken;
-    const draft = chordGenState.draft.slice().sort((a,b)=>a.startStep-b.startStep);
-    const baseStep = draft[0].startStep;
+    const previewBase = getChordGenPlacementBaseStep();
+    const scheduled = buildPlacedChordGenDraft(previewBase);
+    if (!scheduled.length){
+      setStatus("Preview skipped: no chords fit at current cursor");
+      chordGenSetInfo("No previewable chords at current cursor position.");
+      return;
+    }
     const startAt = Tone.now() + 0.03;
     const baseMidi = clamp(midiMinLimit + 28, midiMinLimit, midiMaxLimit);
-    for (const d of draft){
-      const start = startAt + stepSpanToSeconds(d.startStep - baseStep);
+    for (const d of scheduled){
+      const start = startAt + stepSpanToSeconds(d.startStep - previewBase);
       const durSec = Math.max(0.03, stepSpanToSeconds(d.durSteps) - 0.01);
       const mids = chordToMidiTriad(d.chordSymbol, baseMidi);
       const freqs = mids.map(m => Tone.Frequency(m, "midi").toFrequency());
@@ -2779,15 +3129,15 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
         polyChord.triggerAttackRelease(freqs, durSec, start, 0.68);
       }catch(e){}
     }
-    const totalSteps = (draft[draft.length - 1].startStep + draft[draft.length - 1].durSteps) - baseStep;
+    const totalSteps = (scheduled[scheduled.length - 1].startStep + scheduled[scheduled.length - 1].durSteps) - previewBase;
     const totalSec = Math.max(0.05, stepSpanToSeconds(totalSteps));
     chordGenState.previewTimer = setTimeout(()=>{
       if (token !== chordGenState.previewToken) return;
       chordGenState.previewTimer = null;
-      chordGenSetInfo(`Draft ready (${draft.length} chords).`);
+      chordGenSetInfo(`Draft ready (${scheduled.length} chords).`);
     }, Math.ceil((totalSec + 0.05) * 1000));
-    setStatus(`Preview chords: ${draft.length} (${totalSec.toFixed(2)}s)`);
-    chordGenSetInfo(`Previewing draft (${draft.length} chords)...`);
+    setStatus(`Preview chords at cursor: ${scheduled.length} (${totalSec.toFixed(2)}s)`);
+    chordGenSetInfo(`Previewing draft at cursor (${scheduled.length} chords)...`);
   }
 
   function generateChordDraft(spec){
@@ -2832,23 +3182,24 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
       return;
     }
     pushUndo("Apply generated chords");
-    const applied = [];
-    for (const d of chordGenState.draft){
-      const start = clamp(Math.floor(d.startStep), 0, TOTAL_STEPS - 1);
-      const maxDur = Math.max(1, TOTAL_STEPS - start);
-      const dur = clamp(Math.floor(d.durSteps), 1, maxDur);
-      const chordSym = parseChord(d.chordSymbol) ? d.chordSymbol : "C";
-      applied.push({ start, dur, chord: chordSym });
-    }
-    chords = applied.sort((a,b)=>a.start-b.start);
+    const applyBase = getChordGenPlacementBaseStep();
+    const draftSpan = getChordGenDraftSpanSteps();
+    const applyStart = applyBase;
+    const applyEnd = clamp(applyBase + draftSpan, applyBase + 1, TOTAL_STEPS);
+    const applied = buildPlacedChordGenDraft(applyBase)
+      .map(d => ({ start: d.startStep, dur: d.durSteps, chord: d.chordSymbol }));
+    chords = chords
+      .filter(c => !((c.start < applyEnd) && ((c.start + c.dur) > applyStart)))
+      .concat(applied)
+      .sort((a,b)=>a.start-b.start);
     if (cho && cho.sel && cho.sel.set) cho.sel.set.clear();
     chordGenState.draft = [];
     stopChordGenPreview();
     updateChordGenActionButtons();
     rebuildAudio();
     renderAll();
-    setStatus(`Applied generated chords: ${chords.length}`);
-    chordGenSetInfo(`Applied ${chords.length} chords to lane.`);
+    setStatus(`Applied generated chords at ${Math.floor(applyBase/16)+1}:${Math.floor((applyBase%16)/4)+1}:${(applyBase%4)+1}`);
+    chordGenSetInfo(`Applied ${applied.length} generated chords at cursor.`);
   }
 
   // ======== UNDO/REDO ========
@@ -3664,7 +4015,9 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     drawGrid(cctx, chordCanvas.width, chordCanvas.height, false);
     for (const c of chords) drawChordBlock(c);
     if (hasChordGenDraft()){
-      for (const d of chordGenState.draft) drawChordDraftBlock(d);
+      const previewBase = getChordGenPlacementBaseStep();
+      const placedDraft = buildPlacedChordGenDraft(previewBase);
+      for (const d of placedDraft) drawChordDraftBlock(d);
     }
     if (cho.sel.active) drawSelectionRect(cctx, cho.sel.rect);
     if (cho.drag.ghost) drawGhostRect(cctx, cho.drag.ghost);
@@ -4422,6 +4775,40 @@ function hitNote(mx,my){
     });
   }
 
+  if (btnToggleSidebar){
+    btnToggleSidebar.addEventListener("click", ()=>{
+      sidebarCollapsed = !sidebarCollapsed;
+      applySidebarCollapsedState();
+      resizeCanvases();
+      renderAll();
+      setStatus(sidebarCollapsed ? "Sidebar collapsed" : "Sidebar expanded");
+    });
+  }
+  if (btnToggleOps){
+    btnToggleOps.addEventListener("click", ()=>{
+      setOpsPanelOpen(!opsPanelOpen);
+      setStatus(opsPanelOpen ? "Operations opened" : "Operations closed");
+    });
+  }
+  if (btnOpsPanelClose){
+    btnOpsPanelClose.addEventListener("click", ()=>{
+      setOpsPanelOpen(false);
+      setStatus("Operations closed");
+    });
+  }
+
+  window.addEventListener("resize", ()=>{
+    resizeCanvases();
+    renderAll();
+    if (chordPickerState.open) refreshChordPickerUI();
+  });
+  window.addEventListener("keydown", (e)=>{
+    if (e.key === "Escape" && opsPanelOpen){
+      setOpsPanelOpen(false);
+      setStatus("Operations closed");
+    }
+  });
+
   tempo.addEventListener("input", ()=>{
     tempoLabel.textContent = tempo.value;
     Tone.Transport.bpm.value = Number(tempo.value);
@@ -4431,6 +4818,10 @@ function hitNote(mx,my){
   });
   if (chordGenBars){
     chordGenBars.addEventListener("input", syncChordGenBarsUI);
+  }
+  if (chordGenDur){
+    chordGenDur.addEventListener("change", syncChordGenBarsUI);
+    chordGenDur.addEventListener("input", syncChordGenBarsUI);
   }
   randDensity.addEventListener("input", ()=>{
     randDensityLabel.textContent = randDensity.value;
@@ -4500,7 +4891,8 @@ function hitNote(mx,my){
   zoom.addEventListener("input", ()=>{
     ui.pxPerStep = Number(zoom.value);
     zoomLabel.textContent = String(ui.pxPerStep);
-    resizeCanvases();
+    // Keep vertical roll heights stable while changing horizontal zoom.
+    resizeCanvases(false);
     rebuildAudio();
     renderAll();
     setStatus("Zoom changed");
@@ -5260,7 +5652,11 @@ renderAll();
           key: chordGenKey?.value || "C",
           mode: chordGenMode?.value || "major",
           bars: Number(chordGenBars?.value || TOTAL_BARS),
-          chordDurSteps: Number(chordGenDur?.value || 16),
+          chordDurBars: parseChordGenDurBars(),
+          chordDurSteps: chordGenDurBarsToSteps(
+            parseChordGenDurBars(),
+            clamp(Number(chordGenBars?.value || TOTAL_BARS), 1, Math.max(1, TOTAL_BARS)) * STEPS_PER_BAR
+          ),
           cadence: chordGenCadence?.value || "perfect",
           complexity: chordGenComplexity?.value || "triad"
         }
@@ -5347,7 +5743,11 @@ renderAll();
       if (typeof cg.key === "string" && ROOT_PC[cg.key] != null) chordGenKey.value = cg.key;
       if (typeof cg.mode === "string") chordGenMode.value = (cg.mode === "natural_minor") ? "natural_minor" : "major";
       if (typeof cg.bars === "number") chordGenBars.value = String(clamp(cg.bars, 1, Math.max(1, TOTAL_BARS)));
-      if (typeof cg.chordDurSteps === "number") chordGenDur.value = String(clamp(cg.chordDurSteps, 1, 32));
+      if (typeof cg.chordDurBars === "number"){
+        setChordGenDurBarsValue(cg.chordDurBars);
+      }else if (typeof cg.chordDurSteps === "number"){
+        setChordGenDurBarsValue(cg.chordDurSteps / STEPS_PER_BAR);
+      }
       if (typeof cg.cadence === "string" && ["perfect","plagal","half","deceptive"].includes(cg.cadence)) chordGenCadence.value = cg.cadence;
       if (typeof cg.complexity === "string") chordGenComplexity.value = (cg.complexity === "seventh") ? "seventh" : "triad";
     }
@@ -5434,6 +5834,9 @@ renderAll();
     initPhraseStockerUI();
     setupChordPickerUI();
     setTopTab("input");
+    try{ sidebarCollapsed = localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === "1"; }catch(e){ sidebarCollapsed = false; }
+    applySidebarCollapsedState();
+    setOpsPanelOpen(false);
     tempoLabel.textContent = tempo.value;
     barsLabel.textContent = bars.value;
     zoomLabel.textContent = zoom.value;
@@ -5736,4 +6139,3 @@ if ("serviceWorker" in navigator) {
     });
 }
 </script>
-
