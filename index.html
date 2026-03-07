@@ -1947,14 +1947,15 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
   }
 
   function updateMobileToolButtons(){
+    const chordFocused = mobileUI.active && !!selectedPrimaryChord() && !mobileUI.settingsOpen && !mobileUI.phraseOpen;
     if (mobileMelodyTools){
-      mobileMelodyTools.classList.toggle("active", mobileUI.active && mobileUI.mainView === "melody");
+      mobileMelodyTools.classList.toggle("active", mobileUI.active && mobileUI.mainView === "melody" && !chordFocused);
       for (const btn of mobileMelodyTools.querySelectorAll("[data-mobile-tool]")){
         btn.classList.toggle("active", btn.dataset.mobileTool === mobileUI.melodyTool);
       }
     }
     if (mobileChordTools){
-      mobileChordTools.classList.toggle("active", mobileUI.active && mobileUI.mainView === "chords");
+      mobileChordTools.classList.toggle("active", mobileUI.active && (mobileUI.mainView === "chords" || chordFocused));
       for (const btn of mobileChordTools.querySelectorAll("[data-mobile-tool]")){
         btn.classList.toggle("active", btn.dataset.mobileTool === mobileUI.chordTool);
       }
@@ -2020,7 +2021,7 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
     const noteCount = selectedNotesList().length;
     const chord = selectedPrimaryChord();
     const showNote = mobileUI.active && mobileUI.mainView === "melody" && noteCount > 0;
-    const showChord = mobileUI.active && mobileUI.mainView === "chords" && !!chord;
+    const showChord = mobileUI.active && !!chord && !mobileUI.settingsOpen && !mobileUI.phraseOpen;
 
     mobileNoteInspector?.classList.toggle("show", showNote);
     mobileChordInspector?.classList.toggle("show", showChord);
@@ -6177,15 +6178,9 @@ function hitNote(mx,my){
     e.preventDefault();
     rememberTouchInteraction();
     markUserScroll();
-    if (mobileUI.mainView !== "chords"){
-      mobileUI.mainView = "chords";
-      updateMobileLayoutState();
-      resizeCanvases();
-      renderAll();
-    }
     const {mx,my} = canvasMousePos(chordCanvas, e);
     const hit = hitChord(mx,my);
-    const tool = currentMobileTool();
+    const tool = mobileUI.chordTool;
 
     resetMobileTouchState();
     mobileUI.touch.active = true;
