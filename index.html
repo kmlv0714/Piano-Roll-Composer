@@ -608,6 +608,359 @@ body{
   display:block;
 }
 
+.mobileOnly{display:none;}
+.transportSecondary{display:inline-flex;}
+.mobileMainNav{
+  display:none;
+  gap:8px;
+}
+.mobileNavBtn{
+  justify-content:center;
+}
+.mobileEditorDock{
+  display:none;
+}
+.mobileInspector{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.mobileInspectorTitle{
+  font-weight:800;
+  font-size:14px;
+  color:var(--text);
+}
+.mobileInspectorMeta{
+  font-size:12px;
+  color:var(--muted);
+  line-height:1.45;
+}
+.mobileInspectorGroup{
+  display:none;
+  flex-direction:column;
+  gap:8px;
+}
+.mobileInspectorGroup.show{
+  display:flex;
+}
+.mobileInspectorRow{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.mobileInspectorSlider{
+  width:100%;
+  justify-content:space-between;
+}
+.mobileInspectorSlider input[type="range"]{
+  flex:1;
+  min-width:0;
+}
+.mobileToolRow{
+  display:none;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.mobileToolRow.active{
+  display:flex;
+}
+.mobileToolBtn,
+.mobileQuickBtn{
+  min-width:72px;
+  justify-content:center;
+}
+.mobileToolBtn.active,
+.mobileNavBtn.active{
+  border-color:#4f7ec2;
+  box-shadow:0 0 0 3px rgba(56,189,248,.18) inset;
+}
+.mobileRotateHint{
+  display:none;
+}
+.mobileRotateCard{
+  background:linear-gradient(180deg, rgba(8,14,25,.96), rgba(6,10,18,.96));
+  border:1px solid #365075;
+  border-radius:18px;
+  box-shadow:0 20px 40px rgba(0,0,0,.45);
+  padding:14px 16px;
+  max-width:320px;
+}
+.mobileRotateTitle{
+  font-weight:800;
+  margin-bottom:4px;
+}
+
+body.mobile-ui{
+  --mobile-top-h: 132px;
+  --mobile-bottom-h: 168px;
+  overflow:hidden;
+}
+body.mobile-ui #mascotDock{
+  display:none;
+}
+body.mobile-ui .wrap{
+  padding:calc(var(--mobile-top-h) + 8px) 8px calc(var(--mobile-bottom-h) + 8px);
+  gap:8px;
+}
+body.mobile-ui .top{
+  position:fixed;
+  top:8px;
+  left:8px;
+  right:8px;
+  z-index:11500;
+  display:block;
+  pointer-events:none;
+}
+body.mobile-ui .toolbar{
+  pointer-events:auto;
+  padding:10px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  max-height:calc(var(--mobile-top-h) - 8px);
+  overflow:hidden;
+  transition:max-height .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+body.mobile-ui.mobile-settings-open .toolbar{
+  max-height:calc(100vh - 16px);
+  box-shadow:0 24px 48px rgba(0,0,0,.5);
+}
+body.mobile-ui .mobileOnly{
+  display:flex;
+}
+body.mobile-ui .transportFixed{
+  gap:8px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  padding-bottom:2px;
+}
+body.mobile-ui .transportFixed .btn,
+body.mobile-ui .transportFixed .pill{
+  min-height:48px;
+}
+body.mobile-ui .transportSecondary{
+  display:none;
+}
+body.mobile-ui.mobile-settings-open .transportSecondary{
+  display:inline-flex;
+}
+body.mobile-ui.mobile-settings-open .transportFixed{
+  flex-wrap:wrap;
+  overflow:visible;
+}
+body.mobile-ui #mobileMainNav{
+  display:grid;
+  grid-template-columns:repeat(4, minmax(0,1fr));
+}
+body.mobile-ui .mobileNavBtn{
+  min-height:52px;
+  font-size:15px;
+}
+body.mobile-ui .tabBar,
+body.mobile-ui .tabPanels{
+  display:none;
+}
+body.mobile-ui.mobile-settings-open .tabBar{
+  display:flex;
+  flex-wrap:nowrap;
+  overflow-x:auto;
+  padding-bottom:2px;
+}
+body.mobile-ui.mobile-settings-open .tabPanels{
+  display:block;
+  min-height:0;
+  height:calc(100vh - var(--mobile-top-h) - 56px);
+  max-height:none;
+  overflow:hidden;
+  padding:10px;
+}
+body.mobile-ui .tabBtn{
+  min-height:48px;
+  padding:10px 14px;
+  font-size:15px;
+}
+body.mobile-ui .tabPanel{
+  min-height:0;
+  max-height:none;
+}
+body.mobile-ui.mobile-settings-open .tabPanel.active{
+  display:flex;
+  overflow:auto;
+  align-content:flex-start;
+  padding-right:2px;
+  max-height:calc(100vh - var(--mobile-top-h) - 80px);
+}
+body.mobile-ui .tabPanel > *{
+  min-height:48px;
+}
+body.mobile-ui .pill{
+  min-height:48px;
+  border-radius:16px;
+  white-space:normal;
+}
+body.mobile-ui .btn{
+  min-height:48px;
+  border-radius:16px;
+  padding:11px 14px;
+  font-size:15px;
+}
+body.mobile-ui select,
+body.mobile-ui input[type="range"],
+body.mobile-ui input[type="text"],
+body.mobile-ui input[type="number"]{
+  font-size:16px;
+}
+body.mobile-ui .row{
+  grid-template-rows:minmax(0,1fr);
+}
+body.mobile-ui .status{
+  display:none;
+}
+body.mobile-ui .mainLayout,
+body.mobile-ui .mainLayout.sidebar-collapsed{
+  grid-template-columns:minmax(0,1fr);
+  height:calc(100vh - var(--mobile-top-h) - var(--mobile-bottom-h) - 16px);
+}
+body.mobile-ui .leftDock{
+  display:none;
+}
+body.mobile-ui.mobile-phrase-open .leftDock{
+  display:block;
+  position:fixed;
+  inset:calc(var(--mobile-top-h) + 8px) 8px calc(var(--mobile-bottom-h) + 8px) 8px;
+  z-index:11400;
+}
+body.mobile-ui .phraseCard{
+  height:100%;
+  min-height:0;
+  border-radius:20px;
+}
+body.mobile-ui .phraseBody{
+  gap:12px;
+}
+body.mobile-ui .phraseToolbar,
+body.mobile-ui .phraseStorageLine{
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0,1fr));
+}
+body.mobile-ui .phraseStorageLine{
+  grid-template-columns:repeat(2, minmax(0,1fr));
+}
+body.mobile-ui .phraseNameLine{
+  align-items:stretch;
+}
+body.mobile-ui .phraseNameInput{
+  min-height:48px;
+  font-size:16px;
+}
+body.mobile-ui .phraseList{
+  flex:1;
+  max-height:none;
+}
+body.mobile-ui .phraseItem{
+  min-height:64px;
+  padding:12px;
+}
+body.mobile-ui .panel{
+  min-height:0;
+  height:100%;
+}
+body.mobile-ui .panelHeader{
+  padding:10px 12px;
+}
+body.mobile-ui .panelHeader .title{
+  font-size:15px;
+}
+body.mobile-ui .panelHeader .pos{
+  font-size:11px;
+  padding:5px 8px;
+}
+body.mobile-ui .canvasWrap{
+  gap:8px;
+}
+body.mobile-ui .pitchRulerPad,
+body.mobile-ui #pitchSide{
+  width:76px;
+  flex:0 0 76px;
+}
+body.mobile-ui #melodyCanvas,
+body.mobile-ui #pitchCanvas,
+body.mobile-ui #chordCanvas,
+body.mobile-ui #rulerCanvas{
+  touch-action:none;
+}
+body.mobile-ui.mobile-view-chords .melodyFlex{
+  flex:0 0 112px;
+}
+body.mobile-ui.mobile-view-chords .subHeader{
+  margin-top:8px;
+}
+body.mobile-ui #mobileEditorDock{
+  display:flex;
+  position:fixed;
+  left:8px;
+  right:8px;
+  bottom:8px;
+  z-index:11520;
+  padding:10px;
+  flex-direction:column;
+  gap:10px;
+  pointer-events:auto;
+}
+body.mobile-ui.mobile-settings-open #mobileEditorDock,
+body.mobile-ui.mobile-phrase-open #mobileEditorDock{
+  opacity:0;
+  pointer-events:none;
+  transform:translateY(8px);
+}
+body.mobile-ui .opsPanel{
+  top:calc(var(--mobile-top-h) + 8px);
+  left:8px;
+  right:8px;
+  width:auto;
+  max-height:calc(100vh - var(--mobile-top-h) - var(--mobile-bottom-h) - 16px);
+}
+body.mobile-ui .chordPickerOverlay{
+  inset:0;
+  top:auto;
+  right:auto;
+  left:0;
+  transform:none;
+  align-items:flex-end;
+  justify-content:center;
+  padding:0;
+  background:rgba(2,7,14,.42);
+  backdrop-filter:blur(8px);
+}
+body.mobile-ui .chordPickerOverlay.show{
+  display:flex;
+}
+body.mobile-ui .chordPickerWindow{
+  width:100vw;
+  max-height:76vh;
+  border-radius:20px 20px 0 0;
+  padding:16px 14px 18px;
+}
+body.mobile-ui .chordPickerGrid{
+  grid-template-columns:repeat(auto-fill, minmax(86px, 1fr));
+}
+body.mobile-ui .chordPickBtn{
+  min-height:52px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+body.mobile-ui #mobileRotateHint{
+  position:fixed;
+  inset:calc(var(--mobile-top-h) + 8px) 12px auto 12px;
+  z-index:11600;
+  justify-content:center;
+  pointer-events:none;
+}
+body.mobile-ui.mobile-portrait #mobileRotateHint{
+  display:flex;
+}
+
 @media (max-width: 1280px){
   body{overflow:auto;}
   .wrap{
@@ -663,20 +1016,29 @@ body{
         <button id="btnStartAudio" class="btn primary">Audio Unlock</button>
         <button id="btnPlay" class="btn good">Play</button>
         <button id="btnStop" class="btn">Stop</button>
-        <label class="pill">Tempo
+        <button id="btnMobileUndo" class="btn mobileOnly" type="button">Undo</button>
+        <button id="btnMobileRedo" class="btn mobileOnly" type="button">Redo</button>
+        <label class="pill transportSecondary">Tempo
           <input id="tempo" type="range" min="60" max="240" value="180" style="width:160px">
           <span id="tempoLabel">180</span>
         </label>
-        <label class="pill">Master
+        <label class="pill transportSecondary">Master
           <input id="masterVol" type="range" min="0" max="100" value="85" style="width:140px">
           <span id="masterVolLabel">85%</span>
         </label>
-        <button id="btnSave" class="btn">Save JSON</button>
-        <label class="btn" style="gap:10px;cursor:pointer;">
+        <button id="btnSave" class="btn transportSecondary">Save JSON</button>
+        <label class="btn transportSecondary" style="gap:10px;cursor:pointer;">
           Load JSON
           <input id="fileLoad" type="file" accept="application/json" style="display:none">
         </label>
-        <button id="btnToggleOps" class="btn" type="button">Operations</button>
+        <button id="btnToggleOps" class="btn transportSecondary" type="button">Operations</button>
+      </div>
+
+      <div id="mobileMainNav" class="mobileOnly mobileMainNav">
+        <button id="btnMobileViewMelody" class="btn mobileNavBtn active" type="button" data-mobile-view="melody">Melody</button>
+        <button id="btnMobileViewChords" class="btn mobileNavBtn" type="button" data-mobile-view="chords">Chords</button>
+        <button id="btnMobileViewPhrase" class="btn mobileNavBtn" type="button" data-mobile-view="phrase">Phrase</button>
+        <button id="btnMobileViewSettings" class="btn mobileNavBtn" type="button" data-mobile-view="settings">Settings</button>
       </div>
 
       <div class="tabBar">
@@ -1003,6 +1365,55 @@ body{
   </div>
 </div>
 
+  <div id="mobileEditorDock" class="card mobileOnly mobileEditorDock" aria-hidden="true">
+    <div id="mobileInspector" class="mobileInspector">
+      <div id="mobileInspectorTitle" class="mobileInspectorTitle">Melody: tap empty space to move cursor or switch to Draw.</div>
+      <div id="mobileInspectorMeta" class="mobileInspectorMeta">Edit mode drags notes/chords. Empty-area drag pans the timeline.</div>
+      <div id="mobileNoteInspector" class="mobileInspectorGroup">
+        <div class="mobileInspectorRow">
+          <button id="btnMobileDeleteNote" class="btn" type="button">Delete Note</button>
+          <button id="btnMobileCopySelection" class="btn" type="button">Copy</button>
+          <button id="btnMobilePasteClipboard" class="btn" type="button">Paste</button>
+        </div>
+        <label class="pill mobileInspectorSlider">Velocity
+          <input id="mobileNoteVelocity" type="range" min="5" max="127" value="114">
+          <span id="mobileNoteVelocityLabel">90%</span>
+        </label>
+      </div>
+      <div id="mobileChordInspector" class="mobileInspectorGroup">
+        <div class="mobileInspectorRow">
+          <button id="btnMobileChordPicker" class="btn" type="button">Change Chord</button>
+          <button id="btnMobileDeleteChord" class="btn" type="button">Delete Chord</button>
+          <button id="btnMobileAuditionChord" class="btn" type="button">Preview</button>
+        </div>
+      </div>
+    </div>
+    <div id="mobileMelodyTools" class="mobileToolRow">
+      <button class="btn mobileToolBtn active" type="button" data-mobile-tool="edit">Edit</button>
+      <button class="btn mobileToolBtn" type="button" data-mobile-tool="draw">Draw</button>
+      <button class="btn mobileToolBtn" type="button" data-mobile-tool="box">Box</button>
+      <button id="btnMobileZoomOut" class="btn mobileQuickBtn" type="button">Zoom-</button>
+      <button id="btnMobileZoomIn" class="btn mobileQuickBtn" type="button">Zoom+</button>
+      <button id="btnMobileRowsDown" class="btn mobileQuickBtn" type="button">Rows-</button>
+      <button id="btnMobileRowsUp" class="btn mobileQuickBtn" type="button">Rows+</button>
+    </div>
+    <div id="mobileChordTools" class="mobileToolRow">
+      <button class="btn mobileToolBtn active" type="button" data-mobile-tool="edit">Edit</button>
+      <button class="btn mobileToolBtn" type="button" data-mobile-tool="draw">Draw</button>
+      <button id="btnMobileChordZoomOut" class="btn mobileQuickBtn" type="button">Zoom-</button>
+      <button id="btnMobileChordZoomIn" class="btn mobileQuickBtn" type="button">Zoom+</button>
+      <button id="btnMobileFollowToggle" class="btn mobileQuickBtn" type="button">Follow</button>
+      <button id="btnMobileOps" class="btn mobileQuickBtn" type="button">Help</button>
+    </div>
+  </div>
+
+  <div id="mobileRotateHint" class="mobileOnly mobileRotateHint" aria-hidden="true">
+    <div class="mobileRotateCard">
+      <div class="mobileRotateTitle">Landscape recommended</div>
+      <div class="small">Rotate your device for a larger piano roll and chord lane.</div>
+    </div>
+  </div>
+
   <div id="chordPickerOverlay" class="chordPickerOverlay" aria-hidden="true">
     <div id="chordPickerWindow" class="card chordPickerWindow" role="region" aria-label="Chord Picker">
       <div class="chordPickerHead">
@@ -1087,6 +1498,8 @@ body{
   const midiInputSelect = document.getElementById("midiInputSelect");
   const btnPlay = document.getElementById("btnPlay");
   const btnStop = document.getElementById("btnStop");
+  const btnMobileUndo = document.getElementById("btnMobileUndo");
+  const btnMobileRedo = document.getElementById("btnMobileRedo");
   const btnStepInput = document.getElementById("btnStepInput");
   const btnUndo = document.getElementById("btnUndo");
   const btnRedo = document.getElementById("btnRedo");
@@ -1115,6 +1528,35 @@ body{
   const appWrap = document.querySelector(".wrap");
   const topArea = document.querySelector(".top");
   const statusCard = document.querySelector(".card.status");
+  const mobileMainNav = document.getElementById("mobileMainNav");
+  const btnMobileViewMelody = document.getElementById("btnMobileViewMelody");
+  const btnMobileViewChords = document.getElementById("btnMobileViewChords");
+  const btnMobileViewPhrase = document.getElementById("btnMobileViewPhrase");
+  const btnMobileViewSettings = document.getElementById("btnMobileViewSettings");
+  const mobileEditorDock = document.getElementById("mobileEditorDock");
+  const mobileInspectorTitle = document.getElementById("mobileInspectorTitle");
+  const mobileInspectorMeta = document.getElementById("mobileInspectorMeta");
+  const mobileNoteInspector = document.getElementById("mobileNoteInspector");
+  const mobileChordInspector = document.getElementById("mobileChordInspector");
+  const mobileMelodyTools = document.getElementById("mobileMelodyTools");
+  const mobileChordTools = document.getElementById("mobileChordTools");
+  const mobileRotateHint = document.getElementById("mobileRotateHint");
+  const mobileNoteVelocity = document.getElementById("mobileNoteVelocity");
+  const mobileNoteVelocityLabel = document.getElementById("mobileNoteVelocityLabel");
+  const btnMobileDeleteNote = document.getElementById("btnMobileDeleteNote");
+  const btnMobileCopySelection = document.getElementById("btnMobileCopySelection");
+  const btnMobilePasteClipboard = document.getElementById("btnMobilePasteClipboard");
+  const btnMobileChordPicker = document.getElementById("btnMobileChordPicker");
+  const btnMobileDeleteChord = document.getElementById("btnMobileDeleteChord");
+  const btnMobileAuditionChord = document.getElementById("btnMobileAuditionChord");
+  const btnMobileZoomOut = document.getElementById("btnMobileZoomOut");
+  const btnMobileZoomIn = document.getElementById("btnMobileZoomIn");
+  const btnMobileRowsDown = document.getElementById("btnMobileRowsDown");
+  const btnMobileRowsUp = document.getElementById("btnMobileRowsUp");
+  const btnMobileChordZoomOut = document.getElementById("btnMobileChordZoomOut");
+  const btnMobileChordZoomIn = document.getElementById("btnMobileChordZoomIn");
+  const btnMobileFollowToggle = document.getElementById("btnMobileFollowToggle");
+  const btnMobileOps = document.getElementById("btnMobileOps");
 
   const btnToggleDrums = document.getElementById("btnToggleDrums");
   const btnToggleChords = document.getElementById("btnToggleChords");
@@ -1218,6 +1660,34 @@ body{
 
   let sidebarCollapsed = false;
   let opsPanelOpen = false;
+  const MOBILE_LAYOUT_MQ = window.matchMedia("(max-width: 980px), (hover: none) and (pointer: coarse)");
+  const MOBILE_DRAG_START_PX = 8;
+  const mobileUI = {
+    active: false,
+    portrait: false,
+    mainView: "melody",
+    settingsOpen: false,
+    phraseOpen: false,
+    melodyTool: "edit",
+    chordTool: "edit",
+    lastTouchTs: 0,
+    touch: {
+      active: false,
+      area: null,
+      pointerId: null,
+      action: null,
+      startClientX: 0,
+      startClientY: 0,
+      startMx: 0,
+      startMy: 0,
+      startScrollLeft: 0,
+      startScrollTop: 0,
+      startStepCursor: 0,
+      pendingAdd: null,
+      hit: null,
+      didMove: false
+    }
+  };
 
   function applySidebarCollapsedState(){
     if (!mainLayout || !phraseCard) return;
@@ -1237,6 +1707,201 @@ body{
       btnToggleOps.classList.toggle("primary", opsPanelOpen);
       btnToggleOps.textContent = "Operations";
     }
+  }
+
+  function isTouchPointerEvent(e){
+    return !!(e && (e.pointerType === "touch" || e.pointerType === "pen"));
+  }
+
+  function rememberTouchInteraction(){
+    mobileUI.lastTouchTs = performance.now();
+  }
+
+  function shouldIgnoreMouseCompat(){
+    return mobileUI.active && (performance.now() - mobileUI.lastTouchTs) < 700;
+  }
+
+  function selectedNotesList(){
+    return mel && mel.sel && mel.sel.set ? Array.from(mel.sel.set) : [];
+  }
+
+  function selectedChordList(){
+    return cho && cho.sel && cho.sel.set ? Array.from(cho.sel.set) : [];
+  }
+
+  function selectedPrimaryNote(){
+    const arr = selectedNotesList();
+    return arr.length ? arr[0] : null;
+  }
+
+  function selectedPrimaryChord(){
+    const arr = selectedChordList();
+    return arr.length ? arr[0] : null;
+  }
+
+  function currentMobileTool(){
+    return mobileUI.mainView === "chords" ? mobileUI.chordTool : mobileUI.melodyTool;
+  }
+
+  function updateMobileToolButtons(){
+    if (mobileMelodyTools){
+      mobileMelodyTools.classList.toggle("active", mobileUI.active && mobileUI.mainView === "melody");
+      for (const btn of mobileMelodyTools.querySelectorAll("[data-mobile-tool]")){
+        btn.classList.toggle("active", btn.dataset.mobileTool === mobileUI.melodyTool);
+      }
+    }
+    if (mobileChordTools){
+      mobileChordTools.classList.toggle("active", mobileUI.active && mobileUI.mainView === "chords");
+      for (const btn of mobileChordTools.querySelectorAll("[data-mobile-tool]")){
+        btn.classList.toggle("active", btn.dataset.mobileTool === mobileUI.chordTool);
+      }
+    }
+  }
+
+  function setMobileTool(view, tool){
+    if (view === "chords"){
+      mobileUI.chordTool = tool;
+    }else{
+      mobileUI.melodyTool = tool;
+    }
+    updateMobileToolButtons();
+    updateMobileInspector();
+  }
+
+  function setMobileSettingsOpen(open){
+    mobileUI.settingsOpen = !!open;
+    if (mobileUI.settingsOpen){
+      mobileUI.phraseOpen = false;
+      setOpsPanelOpen(false);
+    }
+    updateMobileLayoutState();
+  }
+
+  function setMobilePhraseOpen(open){
+    mobileUI.phraseOpen = !!open;
+    if (mobileUI.phraseOpen){
+      mobileUI.settingsOpen = false;
+      setOpsPanelOpen(false);
+    }
+    updateMobileLayoutState();
+  }
+
+  function setMobileMainView(view){
+    if (view === "phrase"){
+      setMobilePhraseOpen(!mobileUI.phraseOpen);
+      return;
+    }
+    if (view === "settings"){
+      setMobileSettingsOpen(!mobileUI.settingsOpen);
+      return;
+    }
+    mobileUI.mainView = (view === "chords") ? "chords" : "melody";
+    mobileUI.settingsOpen = false;
+    mobileUI.phraseOpen = false;
+    updateMobileLayoutState();
+    resizeCanvases();
+    renderAll();
+  }
+
+  function updateMobileNav(){
+    if (btnMobileViewMelody) btnMobileViewMelody.classList.toggle("active", mobileUI.mainView === "melody" && !mobileUI.settingsOpen && !mobileUI.phraseOpen);
+    if (btnMobileViewChords) btnMobileViewChords.classList.toggle("active", mobileUI.mainView === "chords" && !mobileUI.settingsOpen && !mobileUI.phraseOpen);
+    if (btnMobileViewPhrase) btnMobileViewPhrase.classList.toggle("active", mobileUI.phraseOpen);
+    if (btnMobileViewSettings) btnMobileViewSettings.classList.toggle("active", mobileUI.settingsOpen);
+  }
+
+  function updateMobileInspector(){
+    if (!mobileEditorDock) return;
+
+    const note = selectedPrimaryNote();
+    const noteCount = selectedNotesList().length;
+    const chord = selectedPrimaryChord();
+    const showNote = mobileUI.active && mobileUI.mainView === "melody" && noteCount > 0;
+    const showChord = mobileUI.active && mobileUI.mainView === "chords" && !!chord;
+
+    mobileNoteInspector?.classList.toggle("show", showNote);
+    mobileChordInspector?.classList.toggle("show", showChord);
+
+    if (!mobileUI.active){
+      mobileEditorDock.setAttribute("aria-hidden", "true");
+      return;
+    }
+    mobileEditorDock.setAttribute("aria-hidden", "false");
+
+    if (showNote && note){
+      if (mobileInspectorTitle){
+        mobileInspectorTitle.textContent = noteCount > 1
+          ? `${noteCount} notes selected`
+          : `Note ${midiName(note.midi)}  step ${note.step + 1}  dur ${note.dur}`;
+      }
+      if (mobileInspectorMeta){
+        mobileInspectorMeta.textContent = "Drag a note body to move. Drag a handle to resize. Empty-area drag pans the roll.";
+      }
+      if (mobileNoteVelocity){
+        const velPct = clamp(Math.round((note.vel ?? 0.9) * 100), 5, 127);
+        mobileNoteVelocity.value = String(velPct);
+        if (mobileNoteVelocityLabel) mobileNoteVelocityLabel.textContent = `${velPct}%`;
+      }
+      return;
+    }
+
+    if (showChord && chord){
+      if (mobileInspectorTitle) mobileInspectorTitle.textContent = `Chord ${chord.chord}  start ${chord.start + 1}  dur ${chord.dur}`;
+      if (mobileInspectorMeta) mobileInspectorMeta.textContent = "Drag a chord block to move. Drag a handle to resize. Use Change Chord for picker access.";
+      return;
+    }
+
+    if (mobileInspectorTitle){
+      mobileInspectorTitle.textContent = mobileUI.mainView === "chords"
+        ? `Chord tool: ${mobileUI.chordTool}`
+        : `Melody tool: ${mobileUI.melodyTool}`;
+    }
+    if (mobileInspectorMeta){
+      if (mobileUI.mainView === "chords"){
+        mobileInspectorMeta.textContent = mobileUI.chordTool === "draw"
+          ? "Tap empty space to add a chord. Drag empty space to pan horizontally."
+          : "Tap a chord to select it. Empty-area drag pans horizontally.";
+      }else if (mobileUI.melodyTool === "draw"){
+        mobileInspectorMeta.textContent = "Tap empty space to add a note. Drag empty space to pan the piano roll.";
+      }else if (mobileUI.melodyTool === "box"){
+        mobileInspectorMeta.textContent = "Drag on empty space to box-select notes. Tap a note to toggle it into the selection.";
+      }else{
+        mobileInspectorMeta.textContent = "Tap a note to select it. Drag the note body to move, or drag a handle to resize.";
+      }
+    }
+  }
+
+  function updateMobileLayoutState(){
+    const active = !!mobileUI.active;
+    document.body.classList.toggle("mobile-ui", active);
+    document.body.classList.toggle("mobile-view-chords", active && mobileUI.mainView === "chords");
+    document.body.classList.toggle("mobile-view-melody", active && mobileUI.mainView === "melody");
+    document.body.classList.toggle("mobile-settings-open", active && mobileUI.settingsOpen);
+    document.body.classList.toggle("mobile-phrase-open", active && mobileUI.phraseOpen);
+    document.body.classList.toggle("mobile-portrait", active && mobileUI.portrait);
+    if (mobileEditorDock){
+      mobileEditorDock.setAttribute("aria-hidden", active ? "false" : "true");
+    }
+    updateMobileNav();
+    updateMobileToolButtons();
+    updateMobileInspector();
+    if (btnMobileFollowToggle){
+      btnMobileFollowToggle.classList.toggle("primary", !!ui.follow);
+      btnMobileFollowToggle.textContent = `Follow ${ui.follow ? "ON" : "OFF"}`;
+    }
+    if (mobileRotateHint){
+      mobileRotateHint.setAttribute("aria-hidden", (!active || !mobileUI.portrait) ? "true" : "false");
+    }
+  }
+
+  function refreshMobileMode(){
+    mobileUI.active = !!MOBILE_LAYOUT_MQ.matches;
+    mobileUI.portrait = window.innerHeight > window.innerWidth;
+    if (!mobileUI.active){
+      mobileUI.settingsOpen = false;
+      mobileUI.phraseOpen = false;
+    }
+    updateMobileLayoutState();
   }
 
   let TOTAL_BARS = 16;
@@ -2033,7 +2698,10 @@ body{
     const wrapGap = wrapStyle ? (parseFloat(wrapStyle.rowGap || wrapStyle.gap) || 0) : 0;
     const topH = topArea ? topArea.getBoundingClientRect().height : 0;
     const statusH = statusCard ? statusCard.getBoundingClientRect().height : 0;
-    const panelH = Math.floor(window.innerHeight - wrapPadY - topH - statusH - wrapGap * 2 - 8);
+    const panelRectH = composerPanel ? composerPanel.getBoundingClientRect().height : 0;
+    const panelH = mobileUI.active
+      ? Math.floor(panelRectH)
+      : Math.floor(window.innerHeight - wrapPadY - topH - statusH - wrapGap * 2 - 8);
     if (!panelH || panelH < 280) return;
     const panelHeaderH = composerPanelHeader ? composerPanelHeader.offsetHeight : 44;
     const wrapPad = 24; // .canvasWrap top+bottom paddings
@@ -2041,12 +2709,19 @@ body{
     if (!hostH || hostH < 240) return;
     const rulerH = 34;
     const headerH = composerSubHeader ? composerSubHeader.offsetHeight : 40;
-    const gapBudget = 46;
-    const chordTarget = clamp(Math.round(hostH * 0.125), 60, 120);
-    const melodyTrim = 16; // keep lane a bit more compact
+    const gapBudget = mobileUI.active ? 32 : 46;
+    if (mobileUI.active && mobileUI.mainView === "chords"){
+      const chordTarget = clamp(Math.round(hostH * 0.34), 120, 220);
+      const melodyTarget = hostH - rulerH - headerH - chordTarget - gapBudget - 8;
+      ui.chordH = chordTarget;
+      ui.melodyH = clamp(melodyTarget, 108, 520);
+      return;
+    }
+    const chordTarget = clamp(Math.round(hostH * (mobileUI.active ? 0.16 : 0.125)), mobileUI.active ? 78 : 60, mobileUI.active ? 140 : 120);
+    const melodyTrim = mobileUI.active ? 6 : 16;
     const melodyTarget = hostH - rulerH - headerH - chordTarget - gapBudget - melodyTrim;
     ui.chordH = chordTarget;
-    ui.melodyH = clamp(melodyTarget, 150, 1400);
+    ui.melodyH = clamp(melodyTarget, mobileUI.active ? 180 : 150, 1400);
   }
 
   function applyRollVerticalScale(){
@@ -2121,6 +2796,12 @@ body{
   function noteH(){
     // fixed-ish: no user slider
     return Math.max(16, rowH() * 0.95);
+  }
+  function noteResizeHandleW(){
+    return mobileUI.active ? 18 : 10;
+  }
+  function chordResizeHandleW(){
+    return mobileUI.active ? 18 : 10;
   }
   function totalPitchRows(){
     return Math.max(1, midiMaxLimit - midiMinLimit + 1);
@@ -4225,8 +4906,13 @@ body{
     roundRect(mctx, x0, y+1, w, h-2, 10);
     mctx.stroke();
 
-    mctx.fillStyle = "rgba(255,255,255,0.26)";
-    mctx.fillRect(x0 + w - 6, y+3, 4, h-6);
+    const handleW = Math.min(Math.max(4, noteResizeHandleW() - 2), Math.max(4, w / 2));
+    const handleFill = mel.sel.set.has(n) ? "rgba(255,255,255,0.38)" : "rgba(255,255,255,0.26)";
+    mctx.fillStyle = handleFill;
+    if (mobileUI.active || mel.sel.set.has(n)){
+      mctx.fillRect(x0 + 2, y+3, Math.max(4, handleW - 2), h-6);
+    }
+    mctx.fillRect(x0 + w - handleW, y+3, Math.max(4, handleW - 2), h-6);
   }
 
   function renderMelody(){
@@ -4300,8 +4986,13 @@ body{
       cctx.fillText(rn, x0 + 10 + cctx.measureText(c.chord).width + 10, y + 20);
     }
 
-    cctx.fillStyle = "rgba(255,255,255,0.22)";
-    cctx.fillRect(x0 + w - 6, y+6, 4, h-12);
+    const handleW = Math.min(Math.max(4, chordResizeHandleW() - 2), Math.max(4, w / 2));
+    const handleFill = cho.sel.set.has(c) ? "rgba(255,255,255,0.38)" : "rgba(255,255,255,0.22)";
+    cctx.fillStyle = handleFill;
+    if (mobileUI.active || cho.sel.set.has(c)){
+      cctx.fillRect(x0 + 2, y+6, Math.max(4, handleW - 2), h-12);
+    }
+    cctx.fillRect(x0 + w - handleW, y+6, Math.max(4, handleW - 2), h-12);
   }
 
   function drawChordDraftBlock(d){
@@ -4345,6 +5036,7 @@ body{
     renderRuler();
     renderMelody();
     renderChords();
+    if (mobileUI.active) updateMobileInspector();
   }
 
   // ======== HIT TEST + INTERACTION ========
@@ -4381,7 +5073,10 @@ function hitNote(mx,my){
       const x1 = stepToX(n.step+n.dur);
       const y0 = midiToY(n.midi);
       if (mx>=x0 && mx<=x1 && my>=y0 && my<=y0+h){
-        const edge = mx >= x1-10;
+        const handleW = Math.min((x1 - x0) / 2, noteResizeHandleW());
+        let edge = null;
+        if (mx <= x0 + handleW) edge = "start";
+        else if (mx >= x1 - handleW) edge = "end";
         return {n, edge};
       }
     }
@@ -4496,6 +5191,16 @@ function hitNote(mx,my){
       return true;
     }
 
+    if (mel.drag.mode === "resizeStart"){
+      const g = mel.drag.orig;
+      const rawStep = clamp(quant(g.step + dxSteps), 0, g.step + g.dur - snapSteps());
+      const ns = clamp(rawStep, 0, TOTAL_STEPS - 1);
+      const nd = clamp((g.step + g.dur) - ns, snapSteps(), TOTAL_STEPS - ns);
+      mel.drag.ghost = { x: stepToX(ns), y: midiToY(g.midi), w: Math.max(6, stepToX(ns+nd)-stepToX(ns)), h: noteH() };
+      renderAll();
+      return true;
+    }
+
     if (mel.drag.mode === "moveSelection"){
       const selected = Array.from(mel.sel.set);
       if (selected.length){
@@ -4553,6 +5258,17 @@ function hitNote(mx,my){
       return true;
     }
 
+    if (mel.drag.mode === "resizeStart"){
+      pushUndo("Resize note start");
+      const n = mel.drag.target;
+      const endStep = mel.drag.orig.step + mel.drag.orig.dur;
+      n.step = clamp(quant(mel.drag.orig.step + dxSteps), 0, endStep - snapSteps());
+      n.dur = clamp(endStep - n.step, snapSteps(), TOTAL_STEPS - n.step);
+      mel.drag.mode = null; mel.drag.ghost = null;
+      rebuildAudio(); renderAll(); setStatus("Note start resized");
+      return true;
+    }
+
     if (mel.drag.mode === "moveSelection"){
       pushUndo("Move selection");
       const selected = Array.from(mel.sel.set);
@@ -4574,6 +5290,7 @@ function hitNote(mx,my){
   }
 
   melodyCanvas.addEventListener("mousemove",(e)=>{
+    if (shouldIgnoreMouseCompat()) return;
     if (updateMelodyDragFromEvent(e)) return;
 
     const {mx,my} = canvasMousePos(melodyCanvas, e);
@@ -4586,6 +5303,7 @@ function hitNote(mx,my){
   // ======== MELODY INTERACTION ========
   let rollPan = { active:false, didMove:false, startClientX:0, startScrollLeft:0, down:false };
   melodyCanvas.addEventListener("mousedown",(e)=>{
+    if (shouldIgnoreMouseCompat()) return;
     markUserScroll();
     const {mx,my} = canvasMousePos(melodyCanvas, e);
     const hit = hitNote(mx,my);
@@ -4620,7 +5338,7 @@ function hitNote(mx,my){
 
       mel.drag.target = hit.n;
       mel.drag.orig = deepClone(hit.n);
-      mel.drag.mode = hit.edge ? "resize" : "move";
+      mel.drag.mode = hit.edge === "start" ? "resizeStart" : (hit.edge ? "resize" : "move");
       mel.drag.ghost = null;
       renderAll();
       return;
@@ -4637,14 +5355,20 @@ function hitNote(mx,my){
   });
 
   melodyCanvas.addEventListener("mouseup",(e)=>{
+    if (shouldIgnoreMouseCompat()) return;
     if (finishMelodyDrag(e)) return;
   });
 
   melodyCanvas.addEventListener("dblclick",(e)=>{
+    if (shouldIgnoreMouseCompat()) return;
     // (disabled) double-click delete replaced by right-click
   });
 
   melodyCanvas.addEventListener("contextmenu",(e)=>{
+    if (shouldIgnoreMouseCompat()){
+      e.preventDefault();
+      return;
+    }
     e.preventDefault();
     markUserScroll();
     const {mx,my} = canvasMousePos(melodyCanvas, e);
@@ -4678,6 +5402,7 @@ function hitNote(mx,my){
   }
 
   rulerCanvas.addEventListener("mousedown",(e)=>{
+    if (shouldIgnoreMouseCompat()) return;
     if (isPlaying) return;
     rulerDown = true;
     rulerDidDrag = false;
@@ -4688,6 +5413,7 @@ function hitNote(mx,my){
   });
 
   window.addEventListener("mousemove",(e)=>{
+    if (shouldIgnoreMouseCompat()) return;
     if (mel.drag.mode === "pan"){
       const dx = e.clientX - (mel.drag.startClientX ?? e.clientX);
       if (!mel.drag.didPan && Math.abs(dx) > 4) mel.drag.didPan = true;
@@ -4715,6 +5441,7 @@ function hitNote(mx,my){
   });
 
   window.addEventListener("mouseup",(e)=>{
+    if (shouldIgnoreMouseCompat()) return;
     if (mel.drag.mode === "pan"){
       const pending = mel.drag.pendingAdd;
       const did = !!mel.drag.didPan;
@@ -4744,6 +5471,10 @@ function hitNote(mx,my){
 
   // Right-click on a note to delete
   melodyCanvas.addEventListener("contextmenu",(e)=>{
+    if (shouldIgnoreMouseCompat()){
+      e.preventDefault();
+      return;
+    }
     e.preventDefault();
     markUserScroll();
     const {mx,my} = canvasMousePos(melodyCanvas, e);
@@ -4813,6 +5544,7 @@ function hitNote(mx,my){
   }, {passive:false});
   // Pitch sidebar: click to audition note + highlight briefly
   pitchCanvas.addEventListener("mousedown",(e)=>{
+    if (shouldIgnoreMouseCompat()) return;
     // left click only
     if (e.button !== 0) return;
     // Tone needs user gesture anyway; this is one.
@@ -4846,7 +5578,10 @@ function hitNote(mx,my){
       const x0 = stepToX(c.start);
       const x1 = stepToX(c.start+c.dur);
       if (mx>=x0 && mx<=x1 && my>=y && my<=y+h){
-        const edge = mx >= x1-10;
+        const handleW = Math.min((x1 - x0) / 2, chordResizeHandleW());
+        let edge = null;
+        if (mx <= x0 + handleW) edge = "start";
+        else if (mx >= x1 - handleW) edge = "end";
         return {c, edge};
       }
     }
@@ -4880,6 +5615,7 @@ function hitNote(mx,my){
   }
 
   chordCanvas.addEventListener("mousemove",(e)=>{
+    if (shouldIgnoreMouseCompat()) return;
     const {mx,my} = canvasMousePos(chordCanvas, e);
 
     if (cho.drag.mode === "pending"){
@@ -4906,6 +5642,13 @@ function hitNote(mx,my){
         const nd = clamp(quant(g.dur + dxSteps), snapSteps(), TOTAL_STEPS - g.start);
         cho.drag.ghost = { x: stepToX(g.start), y:10, w: Math.max(10, stepToX(g.start+nd)-stepToX(g.start)), h: chordCanvas.height-20 };
         renderAll();
+      } else if (cho.drag.mode === "resizeStart"){
+        const g = cho.drag.orig;
+        const rawStart = clamp(quant(g.start + dxSteps), 0, g.start + g.dur - snapSteps());
+        const ns = clamp(rawStart, 0, TOTAL_STEPS-1);
+        const nd = clamp((g.start + g.dur) - ns, snapSteps(), TOTAL_STEPS - ns);
+        cho.drag.ghost = { x: stepToX(ns), y:10, w: Math.max(10, stepToX(ns+nd)-stepToX(ns)), h: chordCanvas.height-20 };
+        renderAll();
       }
       return;
     }
@@ -4915,6 +5658,7 @@ function hitNote(mx,my){
   });
 
   chordCanvas.addEventListener("mousedown",(e)=>{
+    if (shouldIgnoreMouseCompat()) return;
     if (e.button !== 0) return;
     markUserScroll();
     const {mx,my} = canvasMousePos(chordCanvas, e);
@@ -4954,7 +5698,7 @@ function hitNote(mx,my){
       }
 
       clearChordHoldTimer();
-      cho.drag.mode = hit.edge ? "resize" : "move";
+      cho.drag.mode = hit.edge === "start" ? "resizeStart" : (hit.edge ? "resize" : "move");
       renderAll();
       return;
     }
@@ -4964,6 +5708,7 @@ function hitNote(mx,my){
   });
 
   chordCanvas.addEventListener("click",(e)=>{
+    if (shouldIgnoreMouseCompat()) return;
     // left click only; don't fire during drag
     if (e.button !== 0) return;
     if (performance.now() < (cho.hold.suppressClickUntil || 0)){
@@ -4979,6 +5724,7 @@ function hitNote(mx,my){
 
 
   chordCanvas.addEventListener("mouseup",(e)=>{
+    if (shouldIgnoreMouseCompat()) return;
     if (cho.drag.mode === "pending"){
       clearChordHoldTimer();
       cho.drag.mode = null;
@@ -5012,9 +5758,22 @@ function hitNote(mx,my){
       rebuildAudio(); renderAll(); setStatus("Chord resized");
       return;
     }
+
+    if (cho.drag.mode === "resizeStart"){
+      pushUndo("Resize chord start");
+      const c = cho.drag.target;
+      const endStep = cho.drag.orig.start + cho.drag.orig.dur;
+      c.start = clamp(quant(cho.drag.orig.start + dxSteps), 0, endStep - snapSteps());
+      c.dur = clamp(endStep - c.start, snapSteps(), TOTAL_STEPS - c.start);
+      chords.sort((a,b)=>a.start-b.start);
+      cho.drag.mode = null; cho.drag.ghost = null;
+      rebuildAudio(); renderAll(); setStatus("Chord start resized");
+      return;
+    }
   });
 
   window.addEventListener("mouseup", ()=>{
+    if (shouldIgnoreMouseCompat()) return;
     if (cho.drag.mode === "pending"){
       clearChordHoldTimer();
       cho.drag.mode = null;
@@ -5023,6 +5782,7 @@ function hitNote(mx,my){
   });
 
   chordCanvas.addEventListener("dblclick",(e)=>{
+    if (shouldIgnoreMouseCompat()) return;
     const {mx,my} = canvasMousePos(chordCanvas, e);
     const hit = hitChord(mx,my);
     if (hit){
@@ -5035,6 +5795,10 @@ function hitNote(mx,my){
   });
 
   chordCanvas.addEventListener("contextmenu",(e)=>{
+    if (shouldIgnoreMouseCompat()){
+      e.preventDefault();
+      return;
+    }
     e.preventDefault();
     markUserScroll();
     const {mx,my} = canvasMousePos(chordCanvas, e);
@@ -5061,6 +5825,349 @@ function hitNote(mx,my){
     hit.c.chord = CHORD_LIST[(idx + dir + CHORD_LIST.length) % CHORD_LIST.length];
     rebuildAudio(); renderAll(); setStatus("Chord changed (wheel)");
   }, {passive:false});
+
+  function resetMobileTouchState(){
+    mobileUI.touch.active = false;
+    mobileUI.touch.area = null;
+    mobileUI.touch.pointerId = null;
+    mobileUI.touch.action = null;
+    mobileUI.touch.startClientX = 0;
+    mobileUI.touch.startClientY = 0;
+    mobileUI.touch.startMx = 0;
+    mobileUI.touch.startMy = 0;
+    mobileUI.touch.startScrollLeft = 0;
+    mobileUI.touch.startScrollTop = 0;
+    mobileUI.touch.startStepCursor = 0;
+    mobileUI.touch.pendingAdd = null;
+    mobileUI.touch.hit = null;
+    mobileUI.touch.didMove = false;
+  }
+
+  function mobilePanMelody(dx, dy){
+    if (!melodyScroll) return;
+    const maxLeft = Math.max(0, melodyScroll.scrollWidth - melodyScroll.clientWidth);
+    const maxTop = Math.max(0, melodyScroll.scrollHeight - melodyScroll.clientHeight);
+    const nextLeft = clamp(mobileUI.touch.startScrollLeft - dx, 0, maxLeft);
+    const nextTop = clamp(mobileUI.touch.startScrollTop - dy, 0, maxTop);
+    melodyScroll.scrollLeft = nextLeft;
+    melodyScroll.scrollTop = nextTop;
+    syncScrollSafe(melodyScroll, chordScroll);
+    syncScrollSafe(melodyScroll, rulerScroll);
+    syncVScrollSafe(melodyScroll, pitchSide);
+    updateViewFromPitchScroll(nextTop);
+    markUserScroll();
+  }
+
+  function mobilePanChords(dx){
+    if (!chordScroll) return;
+    const maxLeft = Math.max(0, chordScroll.scrollWidth - chordScroll.clientWidth);
+    const nextLeft = clamp(mobileUI.touch.startScrollLeft - dx, 0, maxLeft);
+    chordScroll.scrollLeft = nextLeft;
+    syncScrollSafe(chordScroll, melodyScroll);
+    syncScrollSafe(chordScroll, rulerScroll);
+    markUserScroll();
+  }
+
+  function handleMobilePitchTap(e){
+    const {my} = canvasMousePos(pitchCanvas, e);
+    const midi = clamp(yToMidi(my), midiMinLimit, midiMaxLimit);
+    try{
+      if (monitorSynth){
+        const freq = Tone.Frequency(midi, "midi");
+        monitorSynth.volume.value = getMelodyVoicePreset(melodyTimbreValue).volumeDb;
+        try { markSoundActivity(); } catch(err) {}
+        monitorSynth.triggerAttackRelease(freq, 0.18, undefined, 0.9);
+      }
+    }catch(err){}
+    activeMidiNotes.add(midi);
+    renderAll();
+    setTimeout(()=>{
+      activeMidiNotes.delete(midi);
+      renderAll();
+    }, 180);
+  }
+
+  function mobileClearSelectionForArea(area){
+    if (area === "chords"){
+      cho.sel.set.clear();
+    }else{
+      mel.sel.set.clear();
+    }
+    updateMobileInspector();
+  }
+
+  melodyCanvas.addEventListener("pointerdown", (e)=>{
+    if (!mobileUI.active || !isTouchPointerEvent(e) || mobileUI.mainView !== "melody") return;
+    e.preventDefault();
+    rememberTouchInteraction();
+    markUserScroll();
+    const {mx,my} = canvasMousePos(melodyCanvas, e);
+    const hit = hitNote(mx,my);
+    const tool = currentMobileTool();
+
+    resetMobileTouchState();
+    mobileUI.touch.active = true;
+    mobileUI.touch.area = "melody";
+    mobileUI.touch.pointerId = e.pointerId;
+    mobileUI.touch.startClientX = e.clientX;
+    mobileUI.touch.startClientY = e.clientY;
+    mobileUI.touch.startMx = mx;
+    mobileUI.touch.startMy = my;
+    mobileUI.touch.startScrollLeft = melodyScroll.scrollLeft;
+    mobileUI.touch.startScrollTop = melodyScroll.scrollTop;
+    mobileUI.touch.startStepCursor = stepCursor;
+    mobileUI.touch.hit = hit;
+    try{ melodyCanvas.setPointerCapture(e.pointerId); }catch(err){}
+
+    if (hit){
+      if (tool === "box"){
+        if (mel.sel.set.has(hit.n)) mel.sel.set.delete(hit.n);
+        else mel.sel.set.add(hit.n);
+        renderAll();
+        return;
+      }
+      if (!mel.sel.set.has(hit.n)){
+        mel.sel.set.clear();
+        mel.sel.set.add(hit.n);
+      }
+      mel.drag.startX = mx;
+      mel.drag.startY = my;
+      mel.drag.target = hit.n;
+      mel.drag.orig = deepClone(hit.n);
+      mel.drag.ghost = null;
+      if (mel.sel.set.size > 1 && mel.sel.set.has(hit.n) && !hit.edge){
+        mel.drag.mode = "moveSelection";
+        mel.drag.orig = { midi: yToMidi(my) };
+      }else{
+        mel.drag.mode = hit.edge === "start" ? "resizeStart" : (hit.edge ? "resize" : "move");
+      }
+      renderAll();
+      return;
+    }
+
+    setStepCursor(xToStep(mx), true);
+    if (tool === "box"){
+      mel.drag.mode = "select";
+      mel.drag.startX = mx;
+      mel.drag.startY = my;
+      mel.sel.active = true;
+      mel.sel.rect = {x:mx,y:my,w:0,h:0};
+      mel.sel.set.clear();
+      mobileUI.touch.action = "box";
+      renderAll();
+      return;
+    }
+
+    if (tool === "draw"){
+      mobileUI.touch.action = "pendingAdd";
+      mobileUI.touch.pendingAdd = {mx,my};
+    }else{
+      mobileUI.touch.action = "pan";
+      mobileClearSelectionForArea("melody");
+    }
+    renderAll();
+  }, {passive:false});
+
+  chordCanvas.addEventListener("pointerdown", (e)=>{
+    if (!mobileUI.active || !isTouchPointerEvent(e) || mobileUI.mainView !== "chords") return;
+    e.preventDefault();
+    rememberTouchInteraction();
+    markUserScroll();
+    const {mx,my} = canvasMousePos(chordCanvas, e);
+    const hit = hitChord(mx,my);
+    const tool = currentMobileTool();
+
+    resetMobileTouchState();
+    mobileUI.touch.active = true;
+    mobileUI.touch.area = "chords";
+    mobileUI.touch.pointerId = e.pointerId;
+    mobileUI.touch.startClientX = e.clientX;
+    mobileUI.touch.startClientY = e.clientY;
+    mobileUI.touch.startMx = mx;
+    mobileUI.touch.startMy = my;
+    mobileUI.touch.startScrollLeft = chordScroll.scrollLeft;
+    mobileUI.touch.hit = hit;
+    try{ chordCanvas.setPointerCapture(e.pointerId); }catch(err){}
+
+    if (hit){
+      if (!cho.sel.set.has(hit.c)){
+        cho.sel.set.clear();
+        cho.sel.set.add(hit.c);
+      }
+      cho.drag.startX = mx;
+      cho.drag.startClientX = e.clientX;
+      cho.drag.startClientY = e.clientY;
+      cho.drag.target = hit.c;
+      cho.drag.orig = deepClone(hit.c);
+      cho.drag.ghost = null;
+      cho.drag.mode = hit.edge === "start" ? "resizeStart" : (hit.edge ? "resize" : "move");
+      renderAll();
+      return;
+    }
+
+    mobileClearSelectionForArea("chords");
+    mobileUI.touch.action = (tool === "draw") ? "pendingAdd" : "pan";
+    mobileUI.touch.pendingAdd = tool === "draw" ? {mx} : null;
+    renderAll();
+  }, {passive:false});
+
+  pitchCanvas.addEventListener("pointerdown", (e)=>{
+    if (!mobileUI.active || !isTouchPointerEvent(e)) return;
+    e.preventDefault();
+    rememberTouchInteraction();
+    handleMobilePitchTap(e);
+  }, {passive:false});
+
+  window.addEventListener("pointermove", (e)=>{
+    if (!mobileUI.active || !mobileUI.touch.active || e.pointerId !== mobileUI.touch.pointerId) return;
+    if (!isTouchPointerEvent(e)) return;
+    e.preventDefault();
+    rememberTouchInteraction();
+
+    if (mobileUI.touch.area === "melody"){
+      if (mel.drag.mode){
+        const dragDist = Math.hypot(
+          e.clientX - mobileUI.touch.startClientX,
+          e.clientY - mobileUI.touch.startClientY
+        );
+        if (!mobileUI.touch.didMove){
+          if (dragDist < MOBILE_DRAG_START_PX) return;
+          mobileUI.touch.didMove = true;
+        }
+        updateMelodyDragFromEvent(e);
+        return;
+      }
+      const dx = e.clientX - mobileUI.touch.startClientX;
+      const dy = e.clientY - mobileUI.touch.startClientY;
+      if (Math.hypot(dx,dy) >= MOBILE_DRAG_START_PX){
+        mobileUI.touch.didMove = true;
+        mobilePanMelody(dx, dy);
+        renderAll();
+      }
+      return;
+    }
+
+    if (mobileUI.touch.area === "chords"){
+      if (cho.drag.mode){
+        const dragDist = Math.hypot(
+          e.clientX - mobileUI.touch.startClientX,
+          e.clientY - mobileUI.touch.startClientY
+        );
+        if (!mobileUI.touch.didMove){
+          if (dragDist < MOBILE_DRAG_START_PX) return;
+          mobileUI.touch.didMove = true;
+        }
+        const {mx} = canvasMousePos(chordCanvas, e);
+        const dxSteps = quant(xToStep(mx) - xToStep(cho.drag.startX));
+        if (cho.drag.mode === "move"){
+          const g = cho.drag.orig;
+          const ns = clamp(quant(g.start + dxSteps), 0, TOTAL_STEPS-1);
+          const nd = clamp(g.dur, 1, TOTAL_STEPS-ns);
+          cho.drag.ghost = { x: stepToX(ns), y:10, w: Math.max(10, stepToX(ns+nd)-stepToX(ns)), h: chordCanvas.height-20 };
+        }else if (cho.drag.mode === "resize"){
+          const g = cho.drag.orig;
+          const nd = clamp(quant(g.dur + dxSteps), snapSteps(), TOTAL_STEPS - g.start);
+          cho.drag.ghost = { x: stepToX(g.start), y:10, w: Math.max(10, stepToX(g.start+nd)-stepToX(g.start)), h: chordCanvas.height-20 };
+        }else if (cho.drag.mode === "resizeStart"){
+          const g = cho.drag.orig;
+          const rawStart = clamp(quant(g.start + dxSteps), 0, g.start + g.dur - snapSteps());
+          const ns = clamp(rawStart, 0, TOTAL_STEPS-1);
+          const nd = clamp((g.start + g.dur) - ns, snapSteps(), TOTAL_STEPS - ns);
+          cho.drag.ghost = { x: stepToX(ns), y:10, w: Math.max(10, stepToX(ns+nd)-stepToX(ns)), h: chordCanvas.height-20 };
+        }
+        renderAll();
+        return;
+      }
+      const dx = e.clientX - mobileUI.touch.startClientX;
+      if (Math.abs(dx) >= MOBILE_DRAG_START_PX){
+        mobileUI.touch.didMove = true;
+        mobilePanChords(dx);
+        renderAll();
+      }
+    }
+  }, {passive:false});
+
+  window.addEventListener("pointerup", (e)=>{
+    if (!mobileUI.active || !mobileUI.touch.active || e.pointerId !== mobileUI.touch.pointerId) return;
+    rememberTouchInteraction();
+
+    if (mobileUI.touch.area === "melody"){
+      if (mel.drag.mode){
+        if (!mobileUI.touch.didMove && mel.drag.mode !== "select"){
+          mel.drag.mode = null;
+          mel.drag.ghost = null;
+          renderAll();
+        }else{
+          finishMelodyDrag(e);
+        }
+      }else if (mobileUI.touch.action === "pendingAdd" && mobileUI.touch.pendingAdd){
+        const dx = e.clientX - mobileUI.touch.startClientX;
+        const dy = e.clientY - mobileUI.touch.startClientY;
+        if (!mobileUI.touch.didMove && Math.hypot(dx,dy) < MOBILE_DRAG_START_PX){
+          addNoteAt(mobileUI.touch.pendingAdd.mx, mobileUI.touch.pendingAdd.my);
+        }
+      }
+    }else if (mobileUI.touch.area === "chords"){
+      if (cho.drag.mode){
+        if (!mobileUI.touch.didMove){
+          cho.drag.mode = null;
+          cho.drag.ghost = null;
+          renderAll();
+          resetMobileTouchState();
+          updateMobileInspector();
+          return;
+        }
+        const {mx} = canvasMousePos(chordCanvas, e);
+        const dxSteps = quant(xToStep(mx) - xToStep(cho.drag.startX));
+        if (cho.drag.mode === "move"){
+          pushUndo("Move chord");
+          const c = cho.drag.target;
+          c.start = clamp(quant(cho.drag.orig.start + dxSteps), 0, TOTAL_STEPS-1);
+          c.dur = clamp(c.dur, 1, TOTAL_STEPS - c.start);
+          chords.sort((a,b)=>a.start-b.start);
+          cho.drag.mode = null; cho.drag.ghost = null;
+          rebuildAudio(); renderAll(); setStatus("Chord moved");
+        }else if (cho.drag.mode === "resize"){
+          pushUndo("Resize chord");
+          const c = cho.drag.target;
+          c.dur = clamp(quant(cho.drag.orig.dur + dxSteps), snapSteps(), TOTAL_STEPS - c.start);
+          chords.sort((a,b)=>a.start-b.start);
+          cho.drag.mode = null; cho.drag.ghost = null;
+          rebuildAudio(); renderAll(); setStatus("Chord resized");
+        }else if (cho.drag.mode === "resizeStart"){
+          pushUndo("Resize chord start");
+          const c = cho.drag.target;
+          const endStep = cho.drag.orig.start + cho.drag.orig.dur;
+          c.start = clamp(quant(cho.drag.orig.start + dxSteps), 0, endStep - snapSteps());
+          c.dur = clamp(endStep - c.start, snapSteps(), TOTAL_STEPS - c.start);
+          chords.sort((a,b)=>a.start-b.start);
+          cho.drag.mode = null; cho.drag.ghost = null;
+          rebuildAudio(); renderAll(); setStatus("Chord start resized");
+        }
+      }else if (mobileUI.touch.action === "pendingAdd" && mobileUI.touch.pendingAdd){
+        const dx = e.clientX - mobileUI.touch.startClientX;
+        const dy = e.clientY - mobileUI.touch.startClientY;
+        if (!mobileUI.touch.didMove && Math.hypot(dx,dy) < MOBILE_DRAG_START_PX){
+          addChordAt(mobileUI.touch.pendingAdd.mx);
+        }
+      }
+    }
+
+    resetMobileTouchState();
+    updateMobileInspector();
+  }, {passive:false});
+
+  window.addEventListener("pointercancel", ()=>{
+    if (!mobileUI.active) return;
+    resetMobileTouchState();
+    mel.drag.mode = null;
+    mel.drag.ghost = null;
+    mel.sel.active = false;
+    cho.drag.mode = null;
+    cho.drag.ghost = null;
+    updateMobileInspector();
+    renderAll();
+  });
 
   // ======== SCROLL SYNC (fixed) ========
   function syncScrollSafe(from, to){
@@ -5181,6 +6288,7 @@ function hitNote(mx,my){
   btnToggleFollow.addEventListener("click", ()=>{
     ui.follow = !ui.follow;
     btnToggleFollow.textContent = `Follow: ${ui.follow ? "ON":"OFF"}`;
+    updateMobileLayoutState();
     setStatus("Follow toggled");
   });
 
@@ -5225,12 +6333,119 @@ function hitNote(mx,my){
       setStatus("Operations closed");
     });
   }
+  if (btnMobileUndo) btnMobileUndo.addEventListener("click", ()=> btnUndo.click());
+  if (btnMobileRedo) btnMobileRedo.addEventListener("click", ()=> btnRedo.click());
+  if (btnMobileViewMelody) btnMobileViewMelody.addEventListener("click", ()=> setMobileMainView("melody"));
+  if (btnMobileViewChords) btnMobileViewChords.addEventListener("click", ()=> setMobileMainView("chords"));
+  if (btnMobileViewPhrase) btnMobileViewPhrase.addEventListener("click", ()=> setMobileMainView("phrase"));
+  if (btnMobileViewSettings) btnMobileViewSettings.addEventListener("click", ()=> setMobileMainView("settings"));
+  if (mobileMainNav){
+    for (const btn of mobileMainNav.querySelectorAll("[data-mobile-view]")){
+      btn.addEventListener("pointerdown", (e)=>{
+        if (isTouchPointerEvent(e)) rememberTouchInteraction();
+      }, {passive:true});
+    }
+  }
+  if (mobileMelodyTools){
+    for (const btn of mobileMelodyTools.querySelectorAll("[data-mobile-tool]")){
+      btn.addEventListener("click", ()=> setMobileTool("melody", btn.dataset.mobileTool || "edit"));
+    }
+  }
+  if (mobileChordTools){
+    for (const btn of mobileChordTools.querySelectorAll("[data-mobile-tool]")){
+      btn.addEventListener("click", ()=> setMobileTool("chords", btn.dataset.mobileTool || "edit"));
+    }
+  }
+
+  function applyHorizontalZoomDelta(dir){
+    ui.pxPerStep = clamp(ui.pxPerStep + dir * 2, 10, 60);
+    zoom.value = String(ui.pxPerStep);
+    zoomLabel.textContent = String(ui.pxPerStep);
+    resizeCanvases(false);
+    renderAll();
+  }
+
+  function applyPitchRowDelta(dir){
+    ui.rollHeightPct = clamp(ui.rollHeightPct + dir * 10, 70, 220);
+    if (rollHeightPct) rollHeightPct.value = String(ui.rollHeightPct);
+    if (rollHeightPctLabel) rollHeightPctLabel.textContent = `${ui.rollHeightPct}%`;
+    resizeCanvases(false);
+    renderAll();
+  }
+
+  function deleteSelectedNotesMobile(){
+    const selected = selectedNotesList();
+    if (!selected.length) return;
+    pushUndo("Delete selected notes");
+    const del = new Set(selected);
+    notes = notes.filter(n => !del.has(n));
+    mel.sel.set.clear();
+    rebuildAudio();
+    renderAll();
+    setStatus(`Deleted ${selected.length} note${selected.length === 1 ? "" : "s"}`);
+  }
+
+  function deleteSelectedChordsMobile(){
+    const selected = selectedChordList();
+    if (!selected.length) return;
+    pushUndo("Delete selected chords");
+    const del = new Set(selected);
+    chords = chords.filter(c => !del.has(c));
+    cho.sel.set.clear();
+    rebuildAudio();
+    renderAll();
+    setStatus(`Deleted ${selected.length} chord${selected.length === 1 ? "" : "s"}`);
+  }
+
+  if (btnMobileZoomOut) btnMobileZoomOut.addEventListener("click", ()=> applyHorizontalZoomDelta(-1));
+  if (btnMobileZoomIn) btnMobileZoomIn.addEventListener("click", ()=> applyHorizontalZoomDelta(1));
+  if (btnMobileChordZoomOut) btnMobileChordZoomOut.addEventListener("click", ()=> applyHorizontalZoomDelta(-1));
+  if (btnMobileChordZoomIn) btnMobileChordZoomIn.addEventListener("click", ()=> applyHorizontalZoomDelta(1));
+  if (btnMobileRowsDown) btnMobileRowsDown.addEventListener("click", ()=> applyPitchRowDelta(-1));
+  if (btnMobileRowsUp) btnMobileRowsUp.addEventListener("click", ()=> applyPitchRowDelta(1));
+  if (btnMobileCopySelection) btnMobileCopySelection.addEventListener("click", ()=> btnCopy.click());
+  if (btnMobilePasteClipboard) btnMobilePasteClipboard.addEventListener("click", ()=> btnPaste.click());
+  if (btnMobileDeleteNote) btnMobileDeleteNote.addEventListener("click", deleteSelectedNotesMobile);
+  if (btnMobileDeleteChord) btnMobileDeleteChord.addEventListener("click", deleteSelectedChordsMobile);
+  if (btnMobileChordPicker) btnMobileChordPicker.addEventListener("click", ()=>{
+    const chord = selectedPrimaryChord();
+    if (!chord) return;
+    openChordPickerForChord(chord);
+  });
+  if (btnMobileAuditionChord) btnMobileAuditionChord.addEventListener("click", ()=>{
+    const chord = selectedPrimaryChord();
+    if (!chord) return;
+    auditionChordOnClick(chord.chord);
+  });
+  if (btnMobileFollowToggle) btnMobileFollowToggle.addEventListener("click", ()=> btnToggleFollow.click());
+  if (btnMobileOps) btnMobileOps.addEventListener("click", ()=>{
+    setOpsPanelOpen(!opsPanelOpen);
+  });
+  if (mobileNoteVelocity){
+    mobileNoteVelocity.addEventListener("input", ()=>{
+      const pct = clamp(Number(mobileNoteVelocity.value || 90), 5, 127);
+      const vel = clamp(pct / 100, 0.05, 1.27);
+      for (const n of selectedNotesList()){
+        n.vel = vel;
+      }
+      if (mobileNoteVelocityLabel) mobileNoteVelocityLabel.textContent = `${pct}%`;
+      renderAll();
+    });
+  }
 
   window.addEventListener("resize", ()=>{
+    refreshMobileMode();
     resizeCanvases();
     renderAll();
     if (chordPickerState.open) refreshChordPickerUI();
   });
+  if (typeof MOBILE_LAYOUT_MQ.addEventListener === "function"){
+    MOBILE_LAYOUT_MQ.addEventListener("change", ()=>{
+      refreshMobileMode();
+      resizeCanvases();
+      renderAll();
+    });
+  }
   window.addEventListener("keydown", (e)=>{
     if (e.key === "Escape" && opsPanelOpen){
       setOpsPanelOpen(false);
@@ -6403,6 +7618,7 @@ function hitNote(mx,my){
     midiMaxLimit = 12*(5+1);
     viewTopMidi = midiMaxLimit;
 
+    refreshMobileMode();
     resizeCanvases();
     loadDefaultSong();
     for (const n of notes) n.midi = clamp(n.midi, midiMinLimit, midiMaxLimit);
@@ -6421,6 +7637,7 @@ function hitNote(mx,my){
 
     rebuildAudio();
     renderAll();
+    updateMobileLayoutState();
     prevScaleRoot = scaleRoot.value;
     setStatus("Ready (scroll + follow fixed)");
   }
