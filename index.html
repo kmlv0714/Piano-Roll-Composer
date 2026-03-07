@@ -6215,6 +6215,16 @@ renderAll();
   }catch(_){}
 
   let drag = null;
+  const dragAnim = {
+    targetVx: 0,
+    targetVy: 0,
+    vx: 0,
+    vy: 0,
+    tilt: 0,
+    lift: 0,
+    stretchX: 1,
+    stretchY: 1
+  };
   dock.addEventListener('pointerdown', (e) => {
     // Only left button / primary contact
     if (e.button !== undefined && e.button !== 0) return;
@@ -6224,7 +6234,23 @@ renderAll();
       applyDockPos({ x: r.left, y: r.top });
     }
     const rr = dock.getBoundingClientRect();
-    drag = { ox: e.clientX - rr.left, oy: e.clientY - rr.top };
+    drag = {
+      ox: e.clientX - rr.left,
+      oy: e.clientY - rr.top,
+      lastX: e.clientX,
+      lastY: e.clientY,
+      lastT: performance.now(),
+      vx: 0,
+      vy: 0
+    };
+    dragAnim.targetVx = 0;
+    dragAnim.targetVy = 0;
+    dragAnim.vx = 0;
+    dragAnim.vy = 0;
+    dragAnim.tilt = 0;
+    dragAnim.lift = 0;
+    dragAnim.stretchX = 1;
+    dragAnim.stretchY = 1;
     dock.classList.add('dragging');
     dock.setPointerCapture?.(e.pointerId);
     e.preventDefault();
@@ -6232,6 +6258,15 @@ renderAll();
 
   window.addEventListener('pointermove', (e) => {
     if (!drag) return;
+    const now = performance.now();
+    const dtMs = Math.max(1, now - (drag.lastT || now));
+    drag.vx = (e.clientX - drag.lastX) / dtMs;
+    drag.vy = (e.clientY - drag.lastY) / dtMs;
+    dragAnim.targetVx = drag.vx;
+    dragAnim.targetVy = drag.vy;
+    drag.lastX = e.clientX;
+    drag.lastY = e.clientY;
+    drag.lastT = now;
     const w = window.innerWidth;
     const h = window.innerHeight;
     const mw = dock.offsetWidth || 144;
@@ -6250,6 +6285,8 @@ renderAll();
   const endDrag = (e) => {
     if (!drag) return;
     drag = null;
+    dragAnim.targetVx = 0;
+    dragAnim.targetVy = 0;
     dock.classList.remove('dragging');
   };
   window.addEventListener('pointerup', endDrag);
@@ -6338,6 +6375,8 @@ function isTransportPlaying() {
     return fallback;
   }
 
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
   let frame = 0;
   let acc = 0;
   let last = performance.now();
@@ -6347,6 +6386,7 @@ function isTransportPlaying() {
   // at 120 BPM -> about 6 fps (slower than before), and scales with tempo.
   function currentFps(mode) {
     // mode: 'play' | 'idle' | 'sleep'
+    if (mode === 'drag') return 10;
     if (mode === 'sleep') return 3; // sleepy loop
     if (mode !== 'play') return 4; // gentle idle
     const bpm = getBpm();
@@ -6364,7 +6404,32 @@ function isTransportPlaying() {
 
     const playing = isTransportPlaying();
     const sleeping = (!playing) && isSleepingNow();
-    const mode = playing ? 'play' : (sleeping ? 'sleep' : 'idle');
+    const dragging = !!drag;
+    const mode = dragging ? 'drag' : (playing ? 'play' : (sleeping ? 'sleep' : 'idle'));
+    const velBlend = 1 - Math.exp(-dt * 18);
+    const settleBlend = 1 - Math.exp(-dt * 12);
+
+    if (dragging) {
+      dragAnim.vx += (dragAnim.targetVx - dragAnim.vx) * velBlend;
+      dragAnim.vy += (dragAnim.targetVy - dragAnim.vy) * velBlend;
+      dragAnim.targetVx *= Math.exp(-dt * 10);
+      dragAnim.targetVy *= Math.exp(-dt * 10);
+    } else {
+      dragAnim.vx += (0 - dragAnim.vx) * settleBlend;
+      dragAnim.vy += (0 - dragAnim.vy) * settleBlend;
+    }
+
+    const moveX = clamp(dragAnim.vx * 10, -1, 1);
+    const moveY = clamp(dragAnim.vy * 10, -1, 1);
+    const sway = Math.sin(now * 0.018) * 0.035;
+    const targetTilt = dragging ? clamp(moveX * 0.14 + sway, -0.18, 0.18) : 0;
+    const targetStretchX = dragging ? (1 + Math.min(0.08, Math.abs(moveX) * 0.05)) : 1;
+    const targetStretchY = dragging ? (1 - Math.min(0.06, Math.abs(moveX) * 0.03 + Math.abs(moveY) * 0.04)) : 1;
+    const targetLift = dragging ? (2.5 + Math.abs(moveY) * 5 + Math.abs(moveX) * 2) : 0;
+    dragAnim.tilt += (targetTilt - dragAnim.tilt) * (1 - Math.exp(-dt * 16));
+    dragAnim.stretchX += (targetStretchX - dragAnim.stretchX) * (1 - Math.exp(-dt * 14));
+    dragAnim.stretchY += (targetStretchY - dragAnim.stretchY) * (1 - Math.exp(-dt * 14));
+    dragAnim.lift += (targetLift - dragAnim.lift) * (1 - Math.exp(-dt * 14));
 
     if (prevMode !== mode) {
       // Snap to first frame when state changes (feels crisp)
@@ -6382,17 +6447,37 @@ function isTransportPlaying() {
       acc -= steps * spf;
 
       const img = (mode === 'play') ? playSprite : ((mode === 'sleep') ? sleepSprite : idleSprite);
-      const fc = frameCountFor(img, (mode === 'idle') ? 8 : 4);
-      frame = (frame + steps) % fc;
+      const fc = (mode === 'drag') ? 1 : frameCountFor(img, (mode === 'idle') ? 8 : 4);
+      frame = (frame + steps) % Math.max(1, fc);
     }
 
     const img = (mode === 'play') ? playSprite : ((mode === 'sleep') ? sleepSprite : idleSprite);
-    const fc = frameCountFor(img, (mode === 'idle') ? 8 : 4);
+    const fc = (mode === 'drag') ? 1 : frameCountFor(img, (mode === 'idle') ? 8 : 4);
 
     if (img.complete && img.naturalWidth) {
       ctx.clearRect(0, 0, 128, 128);
       const fx = (frame % fc) * frameW;
-      ctx.drawImage(img, fx, 0, frameW, frameH, 0, 0, 128, 128);
+      if (mode === 'drag') {
+        const lift = dragAnim.lift;
+        const shadowW = 22 - Math.min(8, lift * 0.7);
+        const shadowH = 7 - Math.min(3, lift * 0.18);
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.18)';
+        ctx.beginPath();
+        ctx.ellipse(64, 114, Math.max(10, shadowW), Math.max(3, shadowH), 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(64, 64 - lift);
+        ctx.rotate(dragAnim.tilt);
+        ctx.scale(dragAnim.stretchX, dragAnim.stretchY);
+        ctx.drawImage(img, fx, 0, frameW, frameH, -64, -64, 128, 128);
+        ctx.restore();
+      } else {
+        ctx.drawImage(img, fx, 0, frameW, frameH, 0, 0, 128, 128);
+      }
     }
 
     requestAnimationFrame(tick);
