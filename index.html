@@ -257,6 +257,30 @@
     /* Hide scrollbar on melody roll (but keep it scrollable) */
     #melodyScroll{scrollbar-width:none;-ms-overflow-style:none;}
     #melodyScroll::-webkit-scrollbar{width:0;height:0;display:none;}
+    #melodyScroll.vscroll-enabled{scrollbar-width:none;-ms-overflow-style:none;}
+    #melodyScroll.vscroll-enabled::-webkit-scrollbar{width:0;height:0;display:none;}
+    #pitchSide{scrollbar-width:none;-ms-overflow-style:none;}
+    #pitchSide::-webkit-scrollbar{width:0;height:0;display:none;}
+    #chordScroll{
+      scrollbar-width:thin;
+      scrollbar-color: rgba(170,190,220,.22) transparent;
+    }
+    #chordScroll::-webkit-scrollbar{height:8px;}
+    #chordScroll::-webkit-scrollbar-track{background:transparent;}
+    #chordScroll::-webkit-scrollbar-thumb{
+      border-radius:999px;
+      background: rgba(170,190,220,.16);
+      border:2px solid transparent;
+      background-clip:padding-box;
+    }
+    #chordScroll:hover::-webkit-scrollbar-thumb{
+      background: rgba(170,190,220,.28);
+      border:2px solid transparent;
+      background-clip:padding-box;
+    }
+    .vScrollTrack{position:relative; min-height:100%;}
+    #melodyCanvas,
+    #pitchCanvas{position:sticky;top:0}
 
 
     .subHeader{display:flex;align-items:center;justify-content:space-between;margin-top:10px;margin-bottom:6px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);}
@@ -658,6 +682,9 @@ body{
               <option value="fm">FM Bell</option>
               <option value="am">AM Soft</option>
               <option value="mono">Mono Bass/Lead</option>
+              <option value="rock_drive">Rock Drive Lead</option>
+              <option value="rock_power">Rock Power Lead</option>
+              <option value="rock_bass">Rock Bass</option>
             </select>
           </label>
           <button id="btnToggleDrums" class="btn">Drums: ON</button>
@@ -831,6 +858,10 @@ body{
             <input id="zoom" type="range" min="10" max="40" value="18" style="width:160px">
             <span id="zoomLabel">18</span>
           </label>
+            <label class="pill">Pitch Row Height
+            <input id="rollHeightPct" type="range" min="70" max="200" value="100" style="width:140px">
+            <span id="rollHeightPctLabel">100%</span>
+          </label>
           <label class="pill">Pitch Range
             <span class="small">C</span>
             <select id="pitchLowOct"></select>
@@ -893,10 +924,14 @@ body{
           </div>
           <div class="melodyFlex">
             <div class="pitchSide" id="pitchSide">
-              <canvas id="pitchCanvas" width="100" height="520"></canvas>
+              <div id="pitchScrollTrack" class="vScrollTrack">
+                <canvas id="pitchCanvas" width="100" height="520"></canvas>
+              </div>
             </div>
             <div id="melodyScroll" class="scrollX">
-              <canvas id="melodyCanvas" height="520"></canvas>
+              <div id="melodyScrollTrack" class="vScrollTrack">
+                <canvas id="melodyCanvas" height="520"></canvas>
+              </div>
             </div>
           </div>
         
@@ -986,9 +1021,11 @@ body{
   const pctx = pitchCanvas.getContext("2d");
 
   const melodyScroll = document.getElementById("melodyScroll");
+  const melodyScrollTrack = document.getElementById("melodyScrollTrack");
   const rulerScroll  = document.getElementById("rulerScroll");
   const chordScroll  = document.getElementById("chordScroll");
   const pitchSide    = document.getElementById("pitchSide");
+  const pitchScrollTrack = document.getElementById("pitchScrollTrack");
 
   const statusLeft = document.getElementById("statusLeft");
   const posMelody  = document.getElementById("posMelody");
@@ -1028,6 +1065,9 @@ body{
   const composerPanelHeader = composerPanel ? composerPanel.querySelector(".panelHeader") : null;
   const composerCanvasWrap = composerPanel ? composerPanel.querySelector(".canvasWrap") : null;
   const composerSubHeader = composerCanvasWrap ? composerCanvasWrap.querySelector(".subHeader") : null;
+  const appWrap = document.querySelector(".wrap");
+  const topArea = document.querySelector(".top");
+  const statusCard = document.querySelector(".card.status");
 
   const btnToggleDrums = document.getElementById("btnToggleDrums");
   const btnToggleChords = document.getElementById("btnToggleChords");
@@ -1044,6 +1084,8 @@ body{
   const snapSelect = document.getElementById("snapSelect");
   const zoom = document.getElementById("zoom");
   const zoomLabel = document.getElementById("zoomLabel");
+  const rollHeightPct = document.getElementById("rollHeightPct");
+  const rollHeightPctLabel = document.getElementById("rollHeightPctLabel");
 
   const scaleRoot = document.getElementById("scaleRoot");
   const scaleType = document.getElementById("scaleType");
@@ -1154,6 +1196,7 @@ body{
 
   let ui = {
     pxPerStep: 18,
+    rollHeightPct: 100,
     melodyH: 520,
     chordH: 48,      // compact!
     follow: true,
@@ -1215,6 +1258,7 @@ body{
 
   // ===== scroll usability flags =====
   let syncingScroll = false;
+  let syncingVScroll = false;
   let userScrollActive = false;
   let userScrollTimer = null;
 
@@ -1400,48 +1444,116 @@ body{
   let melodyTimbreValue = (localStorage.getItem("melodyTimbre") || "saw");
   let lead = null;
 
-  function buildLead(){
-    // Dispose previous lead safely
-    try{ if (lead) lead.dispose(); }catch(e){}
-    const t = melodyTimbreValue;
+  function cloneToneOptions(opts){
+    return JSON.parse(JSON.stringify(opts || {}));
+  }
 
-    // Common FX chain: delay -> reverb -> limiter -> destination
-    // (We keep FX nodes shared; only synth swaps.)
-    if (t === "fm"){
-      lead = new Tone.FMSynth({
-        harmonicity: 2,
-        modulationIndex: 10,
-        oscillator:{ type:"sine" },
-        envelope:{ attack:0.005, decay:0.12, sustain:0.35, release:0.18 },
-        modulation:{ type:"sine" },
-        modulationEnvelope:{ attack:0.005, decay:0.2, sustain:0.2, release:0.18 }
-      });
-    }else if (t === "am"){
-      lead = new Tone.AMSynth({
-        harmonicity: 1.8,
-        oscillator:{ type:"sine" },
-        envelope:{ attack:0.005, decay:0.12, sustain:0.35, release:0.18 },
-        modulation:{ type:"sine" },
-        modulationEnvelope:{ attack:0.005, decay:0.2, sustain:0.2, release:0.18 }
-      });
-    }else if (t === "mono"){
-      lead = new Tone.MonoSynth({
-        oscillator:{ type:"sawtooth" },
-        filter:{ Q:1, type:"lowpass", rolloff:-24 },
-        envelope:{ attack:0.01, decay:0.15, sustain:0.25, release:0.2 },
-        filterEnvelope:{ attack:0.01, decay:0.12, sustain:0.1, release:0.2, baseFrequency: 200, octaves: 2.2 }
-      });
-    }else{
-      // Standard synth with selectable oscillator
-      const oscType = (t === "square") ? "square" :
-                      (t === "triangle") ? "triangle" :
-                      (t === "sine") ? "sine" : "sawtooth";
-      lead = new Tone.Synth({
-        oscillator:{ type: oscType },
-        envelope:{ attack:0.005, decay:0.08, sustain:0.35, release:0.18 }
-      });
+  function getMelodyVoicePreset(v){
+    switch(String(v || "saw").toLowerCase()){
+      case "fm":
+        return {
+          voice: Tone.FMSynth,
+          options: {
+            harmonicity: 2,
+            modulationIndex: 10,
+            oscillator:{ type:"sine" },
+            envelope:{ attack:0.005, decay:0.12, sustain:0.35, release:0.18 },
+            modulation:{ type:"sine" },
+            modulationEnvelope:{ attack:0.005, decay:0.2, sustain:0.2, release:0.18 }
+          },
+          volumeDb: -4
+        };
+      case "am":
+        return {
+          voice: Tone.AMSynth,
+          options: {
+            harmonicity: 1.8,
+            oscillator:{ type:"sine" },
+            envelope:{ attack:0.005, decay:0.12, sustain:0.35, release:0.18 },
+            modulation:{ type:"sine" },
+            modulationEnvelope:{ attack:0.005, decay:0.2, sustain:0.2, release:0.18 }
+          },
+          volumeDb: -4
+        };
+      case "mono":
+        return {
+          voice: Tone.MonoSynth,
+          options: {
+            oscillator:{ type:"sawtooth" },
+            filter:{ Q:1, type:"lowpass", rolloff:-24 },
+            envelope:{ attack:0.01, decay:0.15, sustain:0.25, release:0.2 },
+            filterEnvelope:{ attack:0.01, decay:0.12, sustain:0.1, release:0.2, baseFrequency: 200, octaves: 2.2 }
+          },
+          volumeDb: -6
+        };
+      case "rock_drive":
+        return {
+          voice: Tone.MonoSynth,
+          options: {
+            oscillator:{ type:"sawtooth" },
+            filter:{ Q:2.2, type:"lowpass", rolloff:-24 },
+            envelope:{ attack:0.002, decay:0.08, sustain:0.22, release:0.09 },
+            filterEnvelope:{ attack:0.002, decay:0.1, sustain:0.05, release:0.1, baseFrequency: 260, octaves: 3.8 }
+          },
+          volumeDb: -3
+        };
+      case "rock_power":
+        return {
+          voice: Tone.MonoSynth,
+          options: {
+            oscillator:{ type:"square" },
+            filter:{ Q:1.4, type:"lowpass", rolloff:-24 },
+            envelope:{ attack:0.003, decay:0.1, sustain:0.32, release:0.1 },
+            filterEnvelope:{ attack:0.003, decay:0.12, sustain:0.08, release:0.12, baseFrequency: 220, octaves: 3.2 }
+          },
+          volumeDb: -3
+        };
+      case "rock_bass":
+        return {
+          voice: Tone.MonoSynth,
+          options: {
+            oscillator:{ type:"sawtooth" },
+            filter:{ Q:1.2, type:"lowpass", rolloff:-24 },
+            envelope:{ attack:0.002, decay:0.13, sustain:0.5, release:0.12 },
+            filterEnvelope:{ attack:0.002, decay:0.16, sustain:0.2, release:0.14, baseFrequency: 90, octaves: 2.4 }
+          },
+          volumeDb: -6
+        };
+      case "sine":
+        return {
+          voice: Tone.Synth,
+          options: { oscillator:{ type:"sine" }, envelope:{ attack:0.005, decay:0.08, sustain:0.35, release:0.18 } },
+          volumeDb: -3
+        };
+      case "triangle":
+      case "pluck":
+        return {
+          voice: Tone.Synth,
+          options: { oscillator:{ type:"triangle" }, envelope:{ attack:0.005, decay:0.08, sustain:0.35, release:0.18 } },
+          volumeDb: -2
+        };
+      case "square":
+        return {
+          voice: Tone.Synth,
+          options: { oscillator:{ type:"square" }, envelope:{ attack:0.005, decay:0.08, sustain:0.35, release:0.16 } },
+          volumeDb: -3
+        };
+      case "saw":
+      case "sawtooth":
+      default:
+        return {
+          voice: Tone.Synth,
+          options: { oscillator:{ type:"sawtooth" }, envelope:{ attack:0.005, decay:0.08, sustain:0.4, release:0.12 } },
+          volumeDb: -2
+        };
     }
+  }
 
+  function buildLead(){
+    try{ if (lead) lead.dispose(); }catch(e){}
+    const preset = getMelodyVoicePreset(melodyTimbreValue);
+    lead = new preset.voice(cloneToneOptions(preset.options));
+    try{ lead.volume.value = preset.volumeDb; }catch(e){}
     lead.chain(delay, reverb, limiter, Tone.Destination);
   }
   buildLead();
@@ -1450,31 +1562,19 @@ body{
   let polyLead = null;
   let polyChord = null;
 
-  function timbreToOscType(v){
-    switch(String(v||"").toLowerCase()){
-      case "sine": return "sine";
-      case "triangle": return "triangle";
-      case "square": return "square";
-      case "saw":
-      case "sawtooth": return "sawtooth";
-      // fallbacks for named presets
-      case "pluck": return "triangle";
-      case "fm": return "sine";
-      default: return "sawtooth";
-    }
-  }
-
   function rebuildPolySynths(){
     const timbreSel = document.getElementById("melodyTimbre");
-    const oscType = timbreToOscType(timbreSel ? timbreSel.value : "saw");
+    const preset = getMelodyVoicePreset(timbreSel ? timbreSel.value : "saw");
     try { if (polyLead) polyLead.dispose(); } catch(e){}
     try { if (polyChord) polyChord.dispose(); } catch(e){}
     // Limit voices to prevent unbounded OscillatorNode growth
     polyLead = new Tone.PolySynth({
       maxPolyphony: 8,
-      voice: Tone.Synth,
-      options: { oscillator:{ type: oscType }, envelope:{ attack:0.005, decay:0.08, sustain:0.4, release:0.12 } }
-    }).toDestination();
+      voice: preset.voice,
+      options: cloneToneOptions(preset.options)
+    });
+    try{ polyLead.volume.value = preset.volumeDb; }catch(e){}
+    polyLead.chain(delay, reverb, limiter, Tone.Destination);
 
     polyChord = new Tone.PolySynth({
       maxPolyphony: 12,
@@ -1720,40 +1820,9 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
   monitorSynth = null;
   function buildMonitorSynth(){
     try{ if (monitorSynth) monitorSynth.dispose(); }catch(e){}
-    const t = melodyTimbreValue;
-    if (t === "fm"){
-      monitorSynth = new Tone.FMSynth({
-        harmonicity: 2,
-        modulationIndex: 10,
-        oscillator:{ type:"sine" },
-        envelope:{ attack:0.005, decay:0.12, sustain:0.35, release:0.18 },
-        modulation:{ type:"sine" },
-        modulationEnvelope:{ attack:0.005, decay:0.2, sustain:0.2, release:0.18 }
-      });
-    }else if (t === "am"){
-      monitorSynth = new Tone.AMSynth({
-        harmonicity: 1.8,
-        oscillator:{ type:"sine" },
-        envelope:{ attack:0.005, decay:0.12, sustain:0.35, release:0.18 },
-        modulation:{ type:"sine" },
-        modulationEnvelope:{ attack:0.005, decay:0.2, sustain:0.2, release:0.18 }
-      });
-    }else if (t === "mono"){
-      monitorSynth = new Tone.MonoSynth({
-        oscillator:{ type:"sawtooth" },
-        filter:{ Q:1, type:"lowpass", rolloff:-24 },
-        envelope:{ attack:0.01, decay:0.15, sustain:0.25, release:0.2 },
-        filterEnvelope:{ attack:0.01, decay:0.12, sustain:0.1, release:0.2, baseFrequency: 200, octaves: 2.2 }
-      });
-    }else{
-      const oscType = (t === "square") ? "square" :
-                      (t === "triangle") ? "triangle" :
-                      (t === "sine") ? "sine" : "sawtooth";
-      monitorSynth = new Tone.Synth({
-        oscillator:{ type: oscType },
-        envelope:{ attack:0.005, decay:0.08, sustain:0.35, release:0.18 }
-      });
-    }
+    const preset = getMelodyVoicePreset(melodyTimbreValue);
+    monitorSynth = new preset.voice(cloneToneOptions(preset.options));
+    try{ monitorSynth.volume.value = preset.volumeDb; }catch(e){}
     monitorSynth.chain(delay, reverb, limiter, Tone.Destination);
   }
   buildMonitorSynth();
@@ -1800,7 +1869,12 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
 
   function fitRollHeightsToViewport(){
     if (!composerCanvasWrap || !composerPanel) return;
-    const panelH = composerPanel.clientHeight;
+    const wrapStyle = appWrap ? getComputedStyle(appWrap) : null;
+    const wrapPadY = wrapStyle ? (parseFloat(wrapStyle.paddingTop) || 0) + (parseFloat(wrapStyle.paddingBottom) || 0) : 0;
+    const wrapGap = wrapStyle ? (parseFloat(wrapStyle.rowGap || wrapStyle.gap) || 0) : 0;
+    const topH = topArea ? topArea.getBoundingClientRect().height : 0;
+    const statusH = statusCard ? statusCard.getBoundingClientRect().height : 0;
+    const panelH = Math.floor(window.innerHeight - wrapPadY - topH - statusH - wrapGap * 2 - 8);
     if (!panelH || panelH < 280) return;
     const panelHeaderH = composerPanelHeader ? composerPanelHeader.offsetHeight : 44;
     const wrapPad = 24; // .canvasWrap top+bottom paddings
@@ -1810,15 +1884,46 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     const headerH = composerSubHeader ? composerSubHeader.offsetHeight : 40;
     const gapBudget = 46;
     const chordTarget = clamp(Math.round(hostH * 0.125), 60, 120);
-    const melodyTarget = hostH - rulerH - headerH - chordTarget - gapBudget;
+    const melodyTrim = 16; // keep lane a bit more compact
+    const melodyTarget = hostH - rulerH - headerH - chordTarget - gapBudget - melodyTrim;
     ui.chordH = chordTarget;
-    ui.melodyH = clamp(melodyTarget, 210, 1400);
+    ui.melodyH = clamp(melodyTarget, 150, 1400);
+  }
+
+  function applyRollVerticalScale(){
+    const lanePx = Math.max(1, Math.round(ui.melodyH));
+    const contentH = pitchScrollContentHeight();
+    const hasVOverflow = contentH > lanePx + 1;
+    if (melodyScroll) melodyScroll.style.height = `${lanePx}px`;
+    if (pitchSide) pitchSide.style.height = `${lanePx}px`;
+    if (melodyScrollTrack){
+      melodyScrollTrack.style.height = `${contentH}px`;
+      melodyScrollTrack.style.width = `${melodyCanvas.width}px`;
+    }
+    if (pitchScrollTrack){
+      pitchScrollTrack.style.height = `${contentH}px`;
+      pitchScrollTrack.style.width = `${pitchCanvas.width}px`;
+    }
+    // Keep canvas viewport fixed and change pitch-row unit height only.
+    melodyCanvas.style.height = `${lanePx}px`;
+    pitchCanvas.style.height = `${lanePx}px`;
+    melodyScroll.classList.toggle("vscroll-enabled", hasVOverflow);
+    if (melodyScroll) melodyScroll.style.overflowY = hasVOverflow ? "auto" : "hidden";
+    if (pitchSide) pitchSide.style.overflowY = hasVOverflow ? "auto" : "hidden";
+    syncPitchScrollFromView();
+    if (melodyScroll && melodyScroll.scrollTop > melodyScroll.scrollHeight - melodyScroll.clientHeight){
+      melodyScroll.scrollTop = Math.max(0, melodyScroll.scrollHeight - melodyScroll.clientHeight);
+    }
+    if (pitchSide && pitchSide.scrollTop > pitchSide.scrollHeight - pitchSide.clientHeight){
+      pitchSide.scrollTop = Math.max(0, pitchSide.scrollHeight - pitchSide.clientHeight);
+    }
   }
 
   function resizeCanvases(refitHeights=true){
     if (refitHeights){
       fitRollHeightsToViewport();
     }
+    viewTopMidi = clampViewTopMidi(viewTopMidi);
     rulerCanvas.height = 34;
     melodyCanvas.height = ui.melodyH;
     chordCanvas.height  = ui.chordH;
@@ -1828,22 +1933,67 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     rulerCanvas.width  = melodyCanvas.width;
     chordCanvas.width  = Math.max(1, TOTAL_STEPS * ui.pxPerStep);
     pitchCanvas.width  = 100;
+    applyRollVerticalScale();
   }
 
-  function viewBottomMidi(){ return viewTopMidi - (VIEW_ROWS - 1); }
+  function viewRows(){
+    const scaleY = clamp((Number(ui.rollHeightPct) || 100) / 100, 0.7, 2.0);
+    const scaled = Math.max(1, Math.round(VIEW_ROWS / scaleY));
+    return clamp(scaled, 1, Math.max(1, midiMaxLimit - midiMinLimit + 1));
+  }
+
+  function clampViewTopMidi(top){
+    return clamp(top, midiMinLimit + (viewRows()-1), midiMaxLimit);
+  }
+
+  function viewBottomMidi(){ return viewTopMidi - (viewRows() - 1); }
 
   function midiToY(midi){
-    const idx = clamp(viewTopMidi - midi, 0, VIEW_ROWS-1);
-    return (idx / VIEW_ROWS) * melodyCanvas.height;
+    const rows = viewRows();
+    const idx = clamp(viewTopMidi - midi, 0, rows-1);
+    return (idx / rows) * melodyCanvas.height;
   }
   function yToMidi(y){
-    const idx = clamp(Math.floor((y / melodyCanvas.height) * VIEW_ROWS), 0, VIEW_ROWS-1);
+    const rows = viewRows();
+    const idx = clamp(Math.floor((y / melodyCanvas.height) * rows), 0, rows-1);
     return clamp(viewTopMidi - idx, midiMinLimit, midiMaxLimit);
   }
-  function rowH(){ return melodyCanvas.height / VIEW_ROWS; }
+  function rowH(){ return melodyCanvas.height / viewRows(); }
   function noteH(){
     // fixed-ish: no user slider
     return Math.max(16, rowH() * 0.95);
+  }
+  function totalPitchRows(){
+    return Math.max(1, midiMaxLimit - midiMinLimit + 1);
+  }
+  function pitchScrollContentHeight(){
+    return Math.max(Math.max(1, Math.round(ui.melodyH)), Math.round(totalPitchRows() * rowH()));
+  }
+  function viewTopMidiFromScrollTop(scrollTop){
+    const pxPerRow = Math.max(1, rowH());
+    const rawTop = midiMaxLimit - Math.round(scrollTop / pxPerRow);
+    return clampViewTopMidi(rawTop);
+  }
+  function pitchScrollTopFromViewTopMidi(){
+    return Math.max(0, Math.round((midiMaxLimit - clampViewTopMidi(viewTopMidi)) * rowH()));
+  }
+  function updateViewFromPitchScroll(scrollTop){
+    const nextTop = viewTopMidiFromScrollTop(scrollTop);
+    if (nextTop === viewTopMidi) return false;
+    viewTopMidi = nextTop;
+    return true;
+  }
+  function syncPitchScrollFromView(){
+    const lanePx = Math.max(1, Math.round(ui.melodyH));
+    const maxTop = Math.max(0, pitchScrollContentHeight() - lanePx);
+    const target = clamp(pitchScrollTopFromViewTopMidi(), 0, maxTop);
+    syncingVScroll = true;
+    try{
+      if (melodyScroll) melodyScroll.scrollTop = target;
+      if (pitchSide) pitchSide.scrollTop = target;
+    }finally{
+      syncingVScroll = false;
+    }
   }
 
   function stepToTime(step){
@@ -3227,6 +3377,7 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     TOTAL_BARS = snap.TOTAL_BARS;
     TOTAL_STEPS = TOTAL_BARS * STEPS_PER_BAR;
     ui = deepClone(snap.ui);
+    if (!Number.isFinite(Number(ui.rollHeightPct))) ui.rollHeightPct = 100;
 
     scaleRoot.value = snap.scaleRoot;
     scaleType.value = snap.scaleType;
@@ -3237,13 +3388,17 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
 
     midiMinLimit = snap.midiMinLimit;
     midiMaxLimit = snap.midiMaxLimit;
-    viewTopMidi = clamp(snap.viewTopMidi, midiMinLimit + (VIEW_ROWS-1), midiMaxLimit);
+    viewTopMidi = clampViewTopMidi(snap.viewTopMidi);
 
     bars.value = String(TOTAL_BARS);
     barsLabel.textContent = String(TOTAL_BARS);
 
     zoom.value = String(ui.pxPerStep);
     zoomLabel.textContent = String(ui.pxPerStep);
+    if (rollHeightPct){
+      rollHeightPct.value = String(clamp(Number(ui.rollHeightPct) || 100, 70, 200));
+      if (rollHeightPctLabel) rollHeightPctLabel.textContent = `${rollHeightPct.value}%`;
+    }
     btnToggleDrums.textContent = `Drums: ${ui.toggles.drums ? "ON":"OFF"}`;
     btnToggleChords.textContent = `Chords: ${ui.toggles.chords ? "ON":"OFF"}`;
     btnToggleAssist.textContent = `Assist: ${ui.toggles.assist ? "ON":"OFF"}`;
@@ -3738,8 +3893,9 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     }
 
     if (isMelody){
-      for (let i=0;i<=VIEW_ROWS;i++){
-        const y = (i/VIEW_ROWS)*h + 0.5;
+      const rows = viewRows();
+      for (let i=0;i<=rows;i++){
+        const y = (i/rows)*h + 0.5;
         const midi = viewTopMidi - i;
         const pc = ((midi%12)+12)%12;
         const isC = (pc===0);
@@ -3829,7 +3985,8 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     pctx.font = "800 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace";
     pctx.textBaseline = "middle";
 
-    for (let i=0;i<VIEW_ROWS;i++){
+    const rows = viewRows();
+    for (let i=0;i<rows;i++){
       const midi = viewTopMidi - i;
       const y = i*rh;
       const pc = ((midi%12)+12)%12;
@@ -3922,7 +4079,8 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
         if (!info) continue;
         const x0 = stepToX(c.start);
         const x1 = stepToX(c.start + c.dur);
-        for (let i=0;i<VIEW_ROWS;i++){
+        const rows = viewRows();
+        for (let i=0;i<rows;i++){
           const midi = viewTopMidi - i;
           const pc = ((midi%12)+12)%12;
           if (info.tones.includes(pc)){
@@ -4100,52 +4258,166 @@ function hitNote(mx,my){
     }
   }
 
-  melodyCanvas.addEventListener("mousemove",(e)=>{
+  function dragEdgeScrollDelta(pos, min, size){
+    const edge = 36;
+    const maxSpeed = 28;
+    if (pos < min + edge){
+      return -Math.round(clamp((min + edge - pos) / edge, 0, 1) * maxSpeed);
+    }
+    if (pos > min + size - edge){
+      return Math.round(clamp((pos - (min + size - edge)) / edge, 0, 1) * maxSpeed);
+    }
+    return 0;
+  }
+
+  function autoScrollMelodyDuringDrag(e){
+    if (!melodyScroll) return false;
+    const rect = melodyScroll.getBoundingClientRect();
+    let changed = false;
+
+    const dx = dragEdgeScrollDelta(e.clientX, rect.left, rect.width);
+    if (dx){
+      const maxLeft = Math.max(0, melodyScroll.scrollWidth - melodyScroll.clientWidth);
+      const nextLeft = clamp(melodyScroll.scrollLeft + dx, 0, maxLeft);
+      if (nextLeft !== melodyScroll.scrollLeft){
+        melodyScroll.scrollLeft = nextLeft;
+        syncScrollSafe(melodyScroll, chordScroll);
+        syncScrollSafe(melodyScroll, rulerScroll);
+        changed = true;
+      }
+    }
+
+    const dy = dragEdgeScrollDelta(e.clientY, rect.top, rect.height);
+    if (dy){
+      const maxTop = Math.max(0, melodyScroll.scrollHeight - melodyScroll.clientHeight);
+      const nextTop = clamp(melodyScroll.scrollTop + dy, 0, maxTop);
+      if (nextTop !== melodyScroll.scrollTop){
+        melodyScroll.scrollTop = nextTop;
+        syncVScrollSafe(melodyScroll, pitchSide);
+        if (updateViewFromPitchScroll(nextTop)) changed = true;
+        changed = true;
+      }
+    }
+
+    if (changed) markUserScroll();
+    return changed;
+  }
+
+  function updateMelodyDragFromEvent(e){
+    if (!mel.drag.mode || mel.drag.mode === "pan") return false;
+
+    autoScrollMelodyDuringDrag(e);
     const {mx,my} = canvasMousePos(melodyCanvas, e);
 
-    if (mel.drag.mode){
-      if (mel.drag.mode === "select"){
-        mel.sel.rect.w = mx - mel.drag.startX;
-        mel.sel.rect.h = my - mel.drag.startY;
-        selectNotesByRect(mel.sel.rect);
+    if (mel.drag.mode === "select"){
+      mel.sel.rect.w = mx - mel.drag.startX;
+      mel.sel.rect.h = my - mel.drag.startY;
+      selectNotesByRect(mel.sel.rect);
+      renderAll();
+      return true;
+    }
+
+    const dxSteps = quant(xToStep(mx) - xToStep(mel.drag.startX));
+    const dyMidi = yToMidi(my) - mel.drag.orig.midi;
+
+    if (mel.drag.mode === "move"){
+      const g = mel.drag.orig;
+      const ns = clamp(quant(g.step + dxSteps), 0, TOTAL_STEPS-1);
+      const nm = clamp(g.midi + dyMidi, midiMinLimit, midiMaxLimit);
+      mel.drag.ghost = { x: stepToX(ns), y: midiToY(nm), w: Math.max(6, stepToX(ns+g.dur)-stepToX(ns)), h: noteH() };
+      renderAll();
+      return true;
+    }
+
+    if (mel.drag.mode === "resize"){
+      const g = mel.drag.orig;
+      const nd = clamp(quant(g.dur + dxSteps), snapSteps(), TOTAL_STEPS - g.step);
+      mel.drag.ghost = { x: stepToX(g.step), y: midiToY(g.midi), w: Math.max(6, stepToX(g.step+nd)-stepToX(g.step)), h: noteH() };
+      renderAll();
+      return true;
+    }
+
+    if (mel.drag.mode === "moveSelection"){
+      const selected = Array.from(mel.sel.set);
+      if (selected.length){
+        const minStep = Math.min(...selected.map(n=>n.step));
+        const maxStep = Math.max(...selected.map(n=>n.step+n.dur));
+        const maxMidi = Math.max(...selected.map(n=>n.midi));
+        const minMidi = Math.min(...selected.map(n=>n.midi));
+        const ns = clamp(quant(minStep + dxSteps), 0, TOTAL_STEPS-1);
+        const dy = yToMidi(my) - mel.drag.orig.midi;
+        mel.drag.ghost = {
+          x: stepToX(ns),
+          y: midiToY(clamp(maxMidi+dy, midiMinLimit, midiMaxLimit)),
+          w: Math.max(10, stepToX(ns + (maxStep-minStep)) - stepToX(ns)),
+          h: (midiToY(clamp(minMidi+dy, midiMinLimit, midiMaxLimit)) + noteH()) - midiToY(clamp(maxMidi+dy, midiMinLimit, midiMaxLimit))
+        };
         renderAll();
-        return;
       }
+      return true;
+    }
 
-      const dxSteps = quant(xToStep(mx) - xToStep(mel.drag.startX));
-      const dyMidi = yToMidi(my) - mel.drag.orig.midi;
+    return false;
+  }
 
-      if (mel.drag.mode === "move"){
-        const g = mel.drag.orig;
-        const ns = clamp(quant(g.step + dxSteps), 0, TOTAL_STEPS-1);
-        const nm = clamp(g.midi + dyMidi, midiMinLimit, midiMaxLimit);
-        mel.drag.ghost = { x: stepToX(ns), y: midiToY(nm), w: Math.max(6, stepToX(ns+g.dur)-stepToX(ns)), h: noteH() };
-        renderAll();
-      } else if (mel.drag.mode === "resize"){
-        const g = mel.drag.orig;
-        const nd = clamp(quant(g.dur + dxSteps), snapSteps(), TOTAL_STEPS - g.step);
-        mel.drag.ghost = { x: stepToX(g.step), y: midiToY(g.midi), w: Math.max(6, stepToX(g.step+nd)-stepToX(g.step)), h: noteH() };
-        renderAll();
-      } else if (mel.drag.mode === "moveSelection"){
-        const selected = Array.from(mel.sel.set);
-        if (selected.length){
-          const minStep = Math.min(...selected.map(n=>n.step));
-          const maxStep = Math.max(...selected.map(n=>n.step+n.dur));
-          const maxMidi = Math.max(...selected.map(n=>n.midi));
-          const minMidi = Math.min(...selected.map(n=>n.midi));
-          const ns = clamp(quant(minStep + dxSteps), 0, TOTAL_STEPS-1);
-          const dy = yToMidi(my) - mel.drag.orig.midi;
-          mel.drag.ghost = {
-            x: stepToX(ns),
-            y: midiToY(clamp(maxMidi+dy, midiMinLimit, midiMaxLimit)),
-            w: Math.max(10, stepToX(ns + (maxStep-minStep)) - stepToX(ns)),
-            h: (midiToY(clamp(minMidi+dy, midiMinLimit, midiMaxLimit)) + noteH()) - midiToY(clamp(maxMidi+dy, midiMinLimit, midiMaxLimit))
-          };
-          renderAll();
+  function finishMelodyDrag(e){
+    if (!mel.drag.mode || mel.drag.mode === "pan") return false;
+
+    if (mel.drag.mode === "select"){
+      mel.drag.mode = null;
+      mel.sel.active = false;
+      renderAll();
+      return true;
+    }
+
+    const {mx,my} = canvasMousePos(melodyCanvas, e);
+    const dxSteps = quant(xToStep(mx) - xToStep(mel.drag.startX));
+    const dyMidi = yToMidi(my) - mel.drag.orig.midi;
+
+    if (mel.drag.mode === "move"){
+      pushUndo("Move note");
+      const n = mel.drag.target;
+      n.step = clamp(quant(mel.drag.orig.step + dxSteps), 0, TOTAL_STEPS-1);
+      n.midi = clamp(mel.drag.orig.midi + dyMidi, midiMinLimit, midiMaxLimit);
+      if (n.step + n.dur > TOTAL_STEPS) n.dur = Math.max(1, TOTAL_STEPS - n.step);
+      mel.drag.mode = null; mel.drag.ghost = null;
+      rebuildAudio(); renderAll(); setStatus("Note moved");
+      return true;
+    }
+
+    if (mel.drag.mode === "resize"){
+      pushUndo("Resize note");
+      const n = mel.drag.target;
+      n.dur = clamp(quant(mel.drag.orig.dur + dxSteps), snapSteps(), TOTAL_STEPS - n.step);
+      mel.drag.mode = null; mel.drag.ghost = null;
+      rebuildAudio(); renderAll(); setStatus("Note resized");
+      return true;
+    }
+
+    if (mel.drag.mode === "moveSelection"){
+      pushUndo("Move selection");
+      const selected = Array.from(mel.sel.set);
+      if (selected.length){
+        const dx = dxSteps;
+        const dy = yToMidi(my) - mel.drag.orig.midi;
+        for (const n of selected){
+          n.step = clamp(quant(n.step + dx), 0, TOTAL_STEPS-1);
+          n.midi = clamp(n.midi + dy, midiMinLimit, midiMaxLimit);
+          if (n.step + n.dur > TOTAL_STEPS) n.dur = Math.max(1, TOTAL_STEPS - n.step);
         }
       }
-      return;
+      mel.drag.mode = null; mel.drag.ghost = null;
+      rebuildAudio(); renderAll(); setStatus("Selection moved");
+      return true;
     }
+
+    return false;
+  }
+
+  melodyCanvas.addEventListener("mousemove",(e)=>{
+    if (updateMelodyDragFromEvent(e)) return;
+
+    const {mx,my} = canvasMousePos(melodyCanvas, e);
 
     const hit = hitNote(mx,my);
     melodyCanvas.style.cursor = hit ? (hit.edge ? "ew-resize" : "grab") : "crosshair";
@@ -4206,55 +4478,7 @@ function hitNote(mx,my){
   });
 
   melodyCanvas.addEventListener("mouseup",(e)=>{
-    if (!mel.drag.mode) return;
-
-    if (mel.drag.mode === "select"){
-      mel.drag.mode = null;
-      mel.sel.active = false;
-      renderAll();
-      return;
-    }
-
-    const {mx,my} = canvasMousePos(melodyCanvas, e);
-    const dxSteps = quant(xToStep(mx) - xToStep(mel.drag.startX));
-    const dyMidi = yToMidi(my) - mel.drag.orig.midi;
-
-    if (mel.drag.mode === "move"){
-      pushUndo("Move note");
-      const n = mel.drag.target;
-      n.step = clamp(quant(mel.drag.orig.step + dxSteps), 0, TOTAL_STEPS-1);
-      n.midi = clamp(mel.drag.orig.midi + dyMidi, midiMinLimit, midiMaxLimit);
-      if (n.step + n.dur > TOTAL_STEPS) n.dur = Math.max(1, TOTAL_STEPS - n.step);
-      mel.drag.mode = null; mel.drag.ghost = null;
-      rebuildAudio(); renderAll(); setStatus("Note moved");
-      return;
-    }
-
-    if (mel.drag.mode === "resize"){
-      pushUndo("Resize note");
-      const n = mel.drag.target;
-      n.dur = clamp(quant(mel.drag.orig.dur + dxSteps), snapSteps(), TOTAL_STEPS - n.step);
-      mel.drag.mode = null; mel.drag.ghost = null;
-      rebuildAudio(); renderAll(); setStatus("Note resized");
-      return;
-    }
-
-    if (mel.drag.mode === "moveSelection"){
-      pushUndo("Move selection");
-      const selected = Array.from(mel.sel.set);
-      if (selected.length){
-        const dx = dxSteps;
-        const dy = yToMidi(my) - mel.drag.orig.midi;
-        for (const n of selected){
-          n.step = clamp(quant(n.step + dx), 0, TOTAL_STEPS-1);
-          n.midi = clamp(n.midi + dy, midiMinLimit, midiMaxLimit);
-          if (n.step + n.dur > TOTAL_STEPS) n.dur = Math.max(1, TOTAL_STEPS - n.step);
-        }
-      }
-      mel.drag.mode = null; mel.drag.ghost = null;
-      rebuildAudio(); renderAll(); setStatus("Selection moved");
-      return;
-    }
+    if (finishMelodyDrag(e)) return;
   });
 
   melodyCanvas.addEventListener("dblclick",(e)=>{
@@ -4314,6 +4538,10 @@ function hitNote(mx,my){
       return;
     }
 
+    if (mel.drag.mode && e.target !== melodyCanvas){
+      if (updateMelodyDragFromEvent(e)) return;
+    }
+
     if (!rulerDown) return;
     if (isPlaying) return;
 
@@ -4342,6 +4570,8 @@ function hitNote(mx,my){
       }
       return;
     }
+
+    if (finishMelodyDrag(e)) return;
 
     if (!rulerDown) return;
     if (isPlaying){ rulerDown = false; return; }
@@ -4375,7 +4605,8 @@ function hitNote(mx,my){
 
   function doVerticalPitchScroll(deltaY){
     const dir = deltaY > 0 ? -1 : 1;
-    viewTopMidi = clamp(viewTopMidi + dir, midiMinLimit + (VIEW_ROWS-1), midiMaxLimit);
+    viewTopMidi = clampViewTopMidi(viewTopMidi + dir);
+    syncPitchScrollFromView();
     renderAll();
   }
 
@@ -4384,6 +4615,16 @@ function hitNote(mx,my){
     const hit = hitNote(mx,my);
     e.preventDefault();
     markUserScroll();
+
+    const canVScroll = melodyScroll.scrollHeight > melodyScroll.clientHeight + 1;
+    if (canVScroll && !e.altKey){
+      const maxTop = Math.max(0, melodyScroll.scrollHeight - melodyScroll.clientHeight);
+      melodyScroll.scrollTop = clamp(melodyScroll.scrollTop + e.deltaY, 0, maxTop);
+      syncVScrollSafe(melodyScroll, pitchSide);
+      if (updateViewFromPitchScroll(melodyScroll.scrollTop)) renderAll();
+      setStatus(`Pitch view: ${midiName(viewBottomMidi())} .. ${midiName(viewTopMidi)}`);
+      return;
+    }
 
     if (hit){
       pushUndo("Wheel pitch");
@@ -4400,6 +4641,14 @@ function hitNote(mx,my){
   pitchSide.addEventListener("wheel",(e)=>{
     e.preventDefault();
     markUserScroll();
+    if (pitchSide.scrollHeight > pitchSide.clientHeight + 1){
+      const maxTop = Math.max(0, pitchSide.scrollHeight - pitchSide.clientHeight);
+      pitchSide.scrollTop = clamp(pitchSide.scrollTop + e.deltaY, 0, maxTop);
+      syncVScrollSafe(pitchSide, melodyScroll);
+      if (updateViewFromPitchScroll(pitchSide.scrollTop)) renderAll();
+      setStatus(`Pitch view: ${midiName(viewBottomMidi())} .. ${midiName(viewTopMidi)}`);
+      return;
+    }
     doVerticalPitchScroll(e.deltaY);
     setStatus(`Pitch view: ${midiName(viewBottomMidi())} .. ${midiName(viewTopMidi)}`);
   }, {passive:false});
@@ -4414,7 +4663,7 @@ function hitNote(mx,my){
     try{
       if (monitorSynth){
         const freq = Tone.Frequency(midi, "midi");
-        monitorSynth.volume.value = -8;
+        monitorSynth.volume.value = getMelodyVoicePreset(melodyTimbreValue).volumeDb;
         try { markSoundActivity(); } catch(e) {}
         monitorSynth.triggerAttackRelease(freq, 0.18, undefined, 0.9);
       }
@@ -4665,12 +4914,33 @@ function hitNote(mx,my){
       syncingScroll = false;
     }
   }
-  melodyScroll.addEventListener("scroll", ()=>{ markUserScroll(); syncScrollSafe(melodyScroll, chordScroll); syncScrollSafe(melodyScroll, rulerScroll); });
+  function syncVScrollSafe(from, to){
+    if (!from || !to) return;
+    if (syncingVScroll) return;
+    syncingVScroll = true;
+    try{
+      to.scrollTop = from.scrollTop;
+    }finally{
+      syncingVScroll = false;
+    }
+  }
+  melodyScroll.addEventListener("scroll", ()=>{
+    markUserScroll();
+    syncScrollSafe(melodyScroll, chordScroll);
+    syncScrollSafe(melodyScroll, rulerScroll);
+    syncVScrollSafe(melodyScroll, pitchSide);
+    if (updateViewFromPitchScroll(melodyScroll.scrollTop)) renderAll();
+  });
   chordScroll.addEventListener("scroll",  ()=>{ markUserScroll(); syncScrollSafe(chordScroll, melodyScroll); syncScrollSafe(chordScroll, rulerScroll); });
   rulerScroll.addEventListener("scroll", ()=>{ markUserScroll(); syncScrollSafe(rulerScroll, melodyScroll); syncScrollSafe(rulerScroll, chordScroll); });
+  pitchSide.addEventListener("scroll", ()=>{
+    markUserScroll();
+    syncVScrollSafe(pitchSide, melodyScroll);
+    if (updateViewFromPitchScroll(pitchSide.scrollTop)) renderAll();
+  });
 
   // When user drags scrollbar/trackpad, mark active too
-  [melodyScroll, chordScroll, rulerScroll].forEach(el=>{
+  [melodyScroll, chordScroll, rulerScroll, pitchSide].forEach(el=>{
     el.addEventListener("pointerdown", markUserScroll);
     el.addEventListener("touchstart", markUserScroll, {passive:true});
     el.addEventListener("wheel", markUserScroll, {passive:true});
@@ -4897,6 +5167,18 @@ function hitNote(mx,my){
     renderAll();
     setStatus("Zoom changed");
   });
+  if (rollHeightPct){
+    rollHeightPct.addEventListener("input", ()=>{
+      ui.rollHeightPct = clamp(Number(rollHeightPct.value) || 100, 70, 200);
+      rollHeightPct.value = String(ui.rollHeightPct);
+      if (rollHeightPctLabel) rollHeightPctLabel.textContent = `${ui.rollHeightPct}%`;
+      // Keep lane layout height unchanged; change pitch-row height only.
+      viewTopMidi = clampViewTopMidi(viewTopMidi);
+      applyRollVerticalScale();
+      renderAll();
+      setStatus(`Roll Y zoom: ${ui.rollHeightPct}%`);
+    });
+  }
 
   function onScaleChanged(){
     // Chords follow key change: transpose roots by delta, then optionally nudge to scale-fitting chords
@@ -4992,7 +5274,7 @@ function hitNote(mx,my){
     const hi = Math.max(low, high);
     midiMinLimit = 12 * (lo + 1);
     midiMaxLimit = 12 * (hi + 1);
-    viewTopMidi = clamp(viewTopMidi, midiMinLimit + (VIEW_ROWS-1), midiMaxLimit);
+    viewTopMidi = clampViewTopMidi(viewTopMidi);
     for (const n of notes) n.midi = clamp(n.midi, midiMinLimit, midiMaxLimit);
     rebuildAudio();
     renderAll();
@@ -5095,7 +5377,7 @@ function hitNote(mx,my){
 
     try{
       const freq = Tone.Frequency(midi, "midi");
-      monitorSynth.volume.value = -8;
+      monitorSynth.volume.value = getMelodyVoicePreset(melodyTimbreValue).volumeDb;
       try { markSoundActivity(); } catch(e) {}
       monitorSynth.triggerAttack(freq, undefined, clamp(v, 0.05, 1.0));
     }catch(e){ /* ignore */ }
@@ -5620,6 +5902,7 @@ renderAll();
       chords: chords.map(c=>({ start:c.start, dur:c.dur, chord:c.chord })),
       ui: {
         pxPerStep: ui.pxPerStep,
+        rollHeightPct: ui.rollHeightPct,
         rollHeight: ui.melodyH,
         chordHeight: ui.chordH,
         snap: { grid: snapSteps() },
@@ -5687,13 +5970,23 @@ renderAll();
     pitchHighOct.value = String(highC);
     midiMinLimit = 12*(Math.min(lowC,highC)+1);
     midiMaxLimit = 12*(Math.max(lowC,highC)+1);
-    viewTopMidi = clamp(Number(data.pitchRange?.viewTopMidi ?? midiMaxLimit), midiMinLimit + (VIEW_ROWS-1), midiMaxLimit);
+    viewTopMidi = clampViewTopMidi(Number(data.pitchRange?.viewTopMidi ?? midiMaxLimit));
 
     if (data.ui?.pxPerStep){
       ui.pxPerStep = clamp(Number(data.ui.pxPerStep), 8, 60);
       zoom.value = String(ui.pxPerStep);
       zoomLabel.textContent = String(ui.pxPerStep);
     }
+    if (typeof data.ui?.rollHeightPct === "number"){
+      ui.rollHeightPct = clamp(Number(data.ui.rollHeightPct), 70, 200);
+    }else{
+      ui.rollHeightPct = clamp(Number(ui.rollHeightPct) || 100, 70, 200);
+    }
+    if (rollHeightPct){
+      rollHeightPct.value = String(ui.rollHeightPct);
+      if (rollHeightPctLabel) rollHeightPctLabel.textContent = `${ui.rollHeightPct}%`;
+    }
+    viewTopMidi = clampViewTopMidi(viewTopMidi);
     if (data.ui?.toggles){
       ui.toggles = {...ui.toggles, ...data.ui.toggles};
     }
@@ -5840,6 +6133,7 @@ renderAll();
     tempoLabel.textContent = tempo.value;
     barsLabel.textContent = bars.value;
     zoomLabel.textContent = zoom.value;
+    if (rollHeightPctLabel) rollHeightPctLabel.textContent = `${rollHeightPct.value}%`;
     randBarsSpanLabel.textContent = randBarsSpan.value;
     randDensityLabel.textContent = randDensity.value;
     randDurVarLabel.textContent = randDurVar.value;
@@ -5854,6 +6148,7 @@ renderAll();
     setMasterVolumePct(initialMaster, false);
 
     ui.pxPerStep = Number(zoom.value);
+    ui.rollHeightPct = clamp(Number(rollHeightPct?.value || 100), 70, 200);
 
     // defaults
     pitchLowOct.value = "3";
