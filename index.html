@@ -719,12 +719,13 @@ body.mobile-ui .toolbar{
   display:flex;
   flex-direction:column;
   gap:10px;
-  max-height:calc(var(--mobile-top-h) - 8px);
-  overflow:hidden;
+  max-height:none;
+  overflow:visible;
   transition:max-height .18s ease, box-shadow .18s ease, transform .18s ease;
 }
 body.mobile-ui.mobile-settings-open .toolbar{
   max-height:calc(var(--mobile-vh, 100vh) - 16px);
+  overflow:auto;
   box-shadow:0 24px 48px rgba(0,0,0,.5);
 }
 body.mobile-ui .mobileOnly{
@@ -814,6 +815,8 @@ body.mobile-ui input[type="number"]{
 }
 body.mobile-ui .row{
   grid-template-rows:minmax(0,1fr);
+  min-height:0;
+  overflow:hidden;
 }
 body.mobile-ui .status{
   display:none;
@@ -822,6 +825,9 @@ body.mobile-ui .mainLayout,
 body.mobile-ui .mainLayout.sidebar-collapsed{
   grid-template-columns:minmax(0,1fr);
   height:calc(var(--mobile-vh, 100vh) - var(--mobile-top-h) - var(--mobile-bottom-h) - 16px);
+  min-height:0;
+  overflow:auto;
+  overscroll-behavior:contain;
 }
 body.mobile-ui .leftDock{
   display:none;
@@ -866,9 +872,14 @@ body.mobile-ui .phraseItem{
 body.mobile-ui .panel{
   min-height:0;
   height:100%;
+  overflow:auto;
+  overscroll-behavior:contain;
 }
 body.mobile-ui .panelHeader{
   padding:10px 12px;
+  position:sticky;
+  top:0;
+  z-index:3;
 }
 body.mobile-ui .panelHeader .title{
   font-size:15px;
@@ -879,11 +890,18 @@ body.mobile-ui .panelHeader .pos{
 }
 body.mobile-ui .canvasWrap{
   gap:8px;
+  min-height:max-content;
+  height:auto;
+  flex:1 0 auto;
 }
 body.mobile-ui .pitchRulerPad,
 body.mobile-ui #pitchSide{
   width:76px;
   flex:0 0 76px;
+}
+body.mobile-ui .melodyFlex{
+  min-height:0;
+  overflow:visible;
 }
 body.mobile-ui #melodyCanvas,
 body.mobile-ui #pitchCanvas,
@@ -908,6 +926,9 @@ body.mobile-ui #mobileEditorDock{
   flex-direction:column;
   gap:10px;
   pointer-events:auto;
+  max-height:min(36vh, 300px);
+  overflow:auto;
+  overscroll-behavior:contain;
 }
 body.mobile-ui.mobile-settings-open #mobileEditorDock,
 body.mobile-ui.mobile-phrase-open #mobileEditorDock{
@@ -954,13 +975,40 @@ body.mobile-ui .chordPickBtn{
 }
 body.mobile-ui #mobileRotateHint{
   position:fixed;
-  inset:calc(var(--mobile-top-h) + 8px) 12px auto 12px;
+  inset:calc(var(--mobile-top-h) + 6px) 12px auto auto;
   z-index:11600;
-  justify-content:center;
+  justify-content:flex-end;
   pointer-events:none;
 }
 body.mobile-ui.mobile-portrait #mobileRotateHint{
   display:flex;
+}
+body.mobile-ui.mobile-portrait .mobileRotateCard{
+  max-width:220px;
+  padding:10px 12px;
+  border-radius:14px;
+  opacity:.94;
+}
+body.mobile-ui.mobile-portrait .mobileRotateTitle{
+  font-size:13px;
+}
+body.mobile-ui.mobile-portrait #mobileRotateHint .small{
+  font-size:11px;
+  line-height:1.35;
+}
+body.mobile-ui.mobile-portrait .mobileInspectorMeta{
+  display:none;
+}
+body.mobile-ui.mobile-portrait .mobileToolBtn,
+body.mobile-ui.mobile-portrait .mobileQuickBtn{
+  min-width:64px;
+}
+body.mobile-ui.mobile-portrait .mobileNavBtn,
+body.mobile-ui.mobile-portrait .transportFixed .btn,
+body.mobile-ui.mobile-portrait .transportFixed .pill,
+body.mobile-ui.mobile-portrait .btn,
+body.mobile-ui.mobile-portrait .pill{
+  min-height:44px;
 }
 
 @media (max-width: 1280px){
@@ -2776,19 +2824,21 @@ body.mobile-ui.mobile-portrait #mobileRotateHint{
     if (!hostH || hostH < 240) return;
     const rulerH = 34;
     const headerH = composerSubHeader ? composerSubHeader.offsetHeight : 40;
-    const gapBudget = mobileUI.active ? 32 : 46;
+    const mobilePortrait = mobileUI.active && mobileUI.portrait;
+    const gapBudget = mobileUI.active ? (mobilePortrait ? 22 : 32) : 46;
     if (mobileUI.active && mobileUI.mainView === "chords"){
-      const chordTarget = clamp(Math.round(hostH * 0.34), 120, 220);
+      const chordTarget = clamp(Math.round(hostH * (mobilePortrait ? 0.28 : 0.34)), mobilePortrait ? 88 : 120, mobilePortrait ? 180 : 220);
       const melodyTarget = hostH - rulerH - headerH - chordTarget - gapBudget - 8;
       ui.chordH = chordTarget;
-      ui.melodyH = clamp(melodyTarget, 108, 520);
+      ui.melodyH = clamp(melodyTarget, mobilePortrait ? 92 : 108, 520);
       return;
     }
-    const chordTarget = clamp(Math.round(hostH * (mobileUI.active ? 0.16 : 0.125)), mobileUI.active ? 78 : 60, mobileUI.active ? 140 : 120);
-    const melodyTrim = mobileUI.active ? 6 : 16;
+    const chordRatio = mobileUI.active ? (mobilePortrait ? 0.12 : 0.16) : 0.125;
+    const chordTarget = clamp(Math.round(hostH * chordRatio), mobileUI.active ? (mobilePortrait ? 56 : 78) : 60, mobileUI.active ? (mobilePortrait ? 110 : 140) : 120);
+    const melodyTrim = mobileUI.active ? (mobilePortrait ? 2 : 6) : 16;
     const melodyTarget = hostH - rulerH - headerH - chordTarget - gapBudget - melodyTrim;
     ui.chordH = chordTarget;
-    ui.melodyH = clamp(melodyTarget, mobileUI.active ? 180 : 150, 1400);
+    ui.melodyH = clamp(melodyTarget, mobileUI.active ? (mobilePortrait ? 120 : 180) : 150, 1400);
   }
 
   function applyRollVerticalScale(){
