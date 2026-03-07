@@ -5719,21 +5719,21 @@ function hitNote(mx,my){
     e.preventDefault();
     markUserScroll();
 
-    const canVScroll = melodyScroll.scrollHeight > melodyScroll.clientHeight + 1;
-    if (canVScroll && !e.altKey){
-      const maxTop = Math.max(0, melodyScroll.scrollHeight - melodyScroll.clientHeight);
-      melodyScroll.scrollTop = clamp(melodyScroll.scrollTop + e.deltaY, 0, maxTop);
-      syncVScrollSafe(melodyScroll, pitchSide);
-      if (updateViewFromPitchScroll(melodyScroll.scrollTop)) renderAll();
-      setStatus(`Pitch view: ${midiName(viewBottomMidi())} .. ${midiName(viewTopMidi)}`);
-      return;
-    }
-
     if (hit){
       pushUndo("Wheel pitch");
       const dir = e.deltaY > 0 ? -1 : 1;
       hit.n.midi = clamp(hit.n.midi + dir, midiMinLimit, midiMaxLimit);
       rebuildAudio(); renderAll(); setStatus("Pitch changed (wheel)");
+      return;
+    }
+
+    const canVScroll = melodyScroll.scrollHeight > melodyScroll.clientHeight + 1;
+    if (canVScroll){
+      const maxTop = Math.max(0, melodyScroll.scrollHeight - melodyScroll.clientHeight);
+      melodyScroll.scrollTop = clamp(melodyScroll.scrollTop + e.deltaY, 0, maxTop);
+      syncVScrollSafe(melodyScroll, pitchSide);
+      if (updateViewFromPitchScroll(melodyScroll.scrollTop)) renderAll();
+      setStatus(`Pitch view: ${midiName(viewBottomMidi())} .. ${midiName(viewTopMidi)}`);
       return;
     }
     doVerticalPitchScroll(e.deltaY);
@@ -6886,6 +6886,7 @@ function hitNote(mx,my){
     midiMaxLimit = 12 * (hi + 1);
     viewTopMidi = clampViewTopMidi(viewTopMidi);
     for (const n of notes) n.midi = clamp(n.midi, midiMinLimit, midiMaxLimit);
+    resizeCanvases(false);
     rebuildAudio();
     renderAll();
     setStatus(`Range: C${lo}..C${hi}`);
