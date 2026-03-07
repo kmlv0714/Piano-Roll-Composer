@@ -3000,6 +3000,10 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
     const idx = clamp(viewTopMidi - midi, 0, rows-1);
     return (idx / rows) * melodyCanvas.height;
   }
+  function midiToWorldY(midi){
+    const clampedMidi = clamp(midi, midiMinLimit, midiMaxLimit);
+    return (midiMaxLimit - clampedMidi) * rowH();
+  }
   function yToMidi(y){
     const rows = viewRows();
     const idx = clamp(Math.floor((y / melodyCanvas.height) * rows), 0, rows-1);
@@ -5162,7 +5166,14 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
 
     for (const n of notes) drawNote(n);
 
-    if (mel.sel.active) drawSelectionRect(mctx, mel.sel.rect);
+    if (mel.sel.active){
+      drawSelectionRect(mctx, {
+        x: mel.sel.rect.x - (melodyScroll ? melodyScroll.scrollLeft : 0),
+        y: mel.sel.rect.y - (melodyScroll ? melodyScroll.scrollTop : 0),
+        w: mel.sel.rect.w,
+        h: mel.sel.rect.h
+      });
+    }
     if (mel.drag.ghost) drawGhostRect(mctx, mel.drag.ghost);
 
     renderPitchSidebar();
@@ -5317,10 +5328,9 @@ function hitNote(mx,my){
     const rr = rectNormalize(r);
     const h = noteH();
     for (const n of notes){
-      if (n.midi > viewTopMidi || n.midi < viewBottomMidi()) continue;
       const x0 = stepToX(n.step);
       const x1 = stepToX(n.step+n.dur);
-      const y0 = midiToY(n.midi);
+      const y0 = midiToWorldY(n.midi);
       if (x1 >= rr.x && x0 <= rr.x+rr.w && y0+h >= rr.y && y0 <= rr.y+rr.h) mel.sel.set.add(n);
     }
   }
@@ -5377,8 +5387,10 @@ function hitNote(mx,my){
     const {mx,my} = canvasMousePos(melodyCanvas, e);
 
     if (mel.drag.mode === "select"){
-      mel.sel.rect.w = mx - mel.drag.startX;
-      mel.sel.rect.h = my - mel.drag.startY;
+      const worldX = mx + (melodyScroll ? melodyScroll.scrollLeft : 0);
+      const worldY = my + (melodyScroll ? melodyScroll.scrollTop : 0);
+      mel.sel.rect.w = worldX - mel.drag.startX;
+      mel.sel.rect.h = worldY - mel.drag.startY;
       selectNotesByRect(mel.sel.rect);
       renderAll();
       return true;
@@ -5523,9 +5535,10 @@ function hitNote(mx,my){
 
     if (e.shiftKey && !hit){
       mel.drag.mode = "select";
-      mel.drag.startX = mx; mel.drag.startY = my;
+      mel.drag.startX = mx + (melodyScroll ? melodyScroll.scrollLeft : 0);
+      mel.drag.startY = my + (melodyScroll ? melodyScroll.scrollTop : 0);
       mel.sel.active = true;
-      mel.sel.rect = {x:mx,y:my,w:0,h:0};
+      mel.sel.rect = {x:mel.drag.startX,y:mel.drag.startY,w:0,h:0};
       mel.sel.set.clear();
       renderAll();
       return;
@@ -6161,10 +6174,10 @@ function hitNote(mx,my){
     setStepCursor(xToStep(mx), true);
     if (tool === "box"){
       mel.drag.mode = "select";
-      mel.drag.startX = mx;
-      mel.drag.startY = my;
+      mel.drag.startX = mx + (melodyScroll ? melodyScroll.scrollLeft : 0);
+      mel.drag.startY = my + (melodyScroll ? melodyScroll.scrollTop : 0);
       mel.sel.active = true;
-      mel.sel.rect = {x:mx,y:my,w:0,h:0};
+      mel.sel.rect = {x:mel.drag.startX,y:mel.drag.startY,w:0,h:0};
       mel.sel.set.clear();
       mobileUI.touch.action = "box";
       renderAll();
