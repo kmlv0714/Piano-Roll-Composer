@@ -680,21 +680,6 @@ body{
   border-color:#4f7ec2;
   box-shadow:0 0 0 3px rgba(56,189,248,.18) inset;
 }
-.mobileRotateHint{
-  display:none;
-}
-.mobileRotateCard{
-  background:linear-gradient(180deg, rgba(8,14,25,.96), rgba(6,10,18,.96));
-  border:1px solid #365075;
-  border-radius:18px;
-  box-shadow:0 20px 40px rgba(0,0,0,.45);
-  padding:14px 16px;
-  max-width:320px;
-}
-.mobileRotateTitle{
-  font-weight:800;
-  margin-bottom:4px;
-}
 
 body.mobile-ui{
   --mobile-top-h: 132px;
@@ -1036,29 +1021,6 @@ body.mobile-ui .chordPickBtn{
   display:flex;
   align-items:center;
   justify-content:center;
-}
-body.mobile-ui #mobileRotateHint{
-  position:fixed;
-  inset:calc(var(--mobile-top-h) + 6px) 12px auto auto;
-  z-index:11600;
-  justify-content:flex-end;
-  pointer-events:none;
-}
-body.mobile-ui.mobile-portrait #mobileRotateHint{
-  display:flex;
-}
-body.mobile-ui.mobile-portrait .mobileRotateCard{
-  max-width:220px;
-  padding:10px 12px;
-  border-radius:14px;
-  opacity:.94;
-}
-body.mobile-ui.mobile-portrait .mobileRotateTitle{
-  font-size:13px;
-}
-body.mobile-ui.mobile-portrait #mobileRotateHint .small{
-  font-size:11px;
-  line-height:1.35;
 }
 body.mobile-ui.mobile-portrait .mobileInspectorMeta{
   display:none;
@@ -1577,13 +1539,6 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
     </div>
   </div>
 
-  <div id="mobileRotateHint" class="mobileOnly mobileRotateHint" aria-hidden="true">
-    <div class="mobileRotateCard">
-      <div class="mobileRotateTitle">Landscape recommended</div>
-      <div class="small">Rotate your device for a larger piano roll and chord lane.</div>
-    </div>
-  </div>
-
   <div id="chordPickerOverlay" class="chordPickerOverlay" aria-hidden="true">
     <div id="chordPickerWindow" class="card chordPickerWindow" role="region" aria-label="Chord Picker">
       <div class="chordPickerHead">
@@ -1710,7 +1665,6 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
   const mobileChordInspector = document.getElementById("mobileChordInspector");
   const mobileMelodyTools = document.getElementById("mobileMelodyTools");
   const mobileChordTools = document.getElementById("mobileChordTools");
-  const mobileRotateHint = document.getElementById("mobileRotateHint");
   const mobileNoteVelocity = document.getElementById("mobileNoteVelocity");
   const mobileNoteVelocityLabel = document.getElementById("mobileNoteVelocityLabel");
   const btnMobileDeleteNote = document.getElementById("btnMobileDeleteNote");
@@ -2137,9 +2091,6 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
     if (btnMobileFollowToggle){
       btnMobileFollowToggle.classList.toggle("primary", !!ui.follow);
       btnMobileFollowToggle.textContent = `Follow ${ui.follow ? "ON" : "OFF"}`;
-    }
-    if (mobileRotateHint){
-      mobileRotateHint.setAttribute("aria-hidden", (!active || !mobileUI.portrait) ? "true" : "false");
     }
     scheduleMobileViewportMetrics(true);
   }
