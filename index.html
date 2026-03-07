@@ -715,16 +715,23 @@ body.mobile-ui .top{
 }
 body.mobile-ui .toolbar{
   pointer-events:auto;
-  padding:10px;
+  padding:8px;
   display:flex;
   flex-direction:column;
-  gap:10px;
+  gap:6px;
   max-height:none;
   overflow:visible;
   transition:max-height .18s ease, box-shadow .18s ease, transform .18s ease;
 }
+body.mobile-ui.mobile-settings-open .top{
+  bottom:8px;
+}
+body.mobile-ui.mobile-settings-open .wrap{
+  padding:8px;
+}
 body.mobile-ui.mobile-settings-open .toolbar{
-  max-height:calc(var(--mobile-vh, 100vh) - 16px);
+  height:100%;
+  max-height:none;
   overflow:auto;
   box-shadow:0 24px 48px rgba(0,0,0,.5);
 }
@@ -732,14 +739,14 @@ body.mobile-ui .mobileOnly{
   display:flex;
 }
 body.mobile-ui .transportFixed{
-  gap:8px;
+  gap:6px;
   overflow-x:auto;
   overflow-y:hidden;
   padding-bottom:2px;
 }
 body.mobile-ui .transportFixed .btn,
 body.mobile-ui .transportFixed .pill{
-  min-height:48px;
+  min-height:40px;
 }
 body.mobile-ui .transportSecondary{
   display:none;
@@ -754,10 +761,12 @@ body.mobile-ui.mobile-settings-open .transportFixed{
 body.mobile-ui #mobileMainNav{
   display:grid;
   grid-template-columns:repeat(4, minmax(0,1fr));
+  gap:6px;
 }
 body.mobile-ui .mobileNavBtn{
-  min-height:52px;
-  font-size:15px;
+  min-height:40px;
+  font-size:14px;
+  padding:8px 10px;
 }
 body.mobile-ui .tabBar,
 body.mobile-ui .tabPanels{
@@ -771,16 +780,17 @@ body.mobile-ui.mobile-settings-open .tabBar{
 }
 body.mobile-ui.mobile-settings-open .tabPanels{
   display:block;
+  flex:1 1 auto;
   min-height:0;
-  height:calc(var(--mobile-vh, 100vh) - var(--mobile-top-h) - 56px);
+  height:auto;
   max-height:none;
-  overflow:hidden;
-  padding:10px;
+  overflow:auto;
+  padding:8px;
 }
 body.mobile-ui .tabBtn{
-  min-height:48px;
-  padding:10px 14px;
-  font-size:15px;
+  min-height:40px;
+  padding:8px 12px;
+  font-size:14px;
 }
 body.mobile-ui .tabPanel{
   min-height:0;
@@ -791,32 +801,36 @@ body.mobile-ui.mobile-settings-open .tabPanel.active{
   overflow:auto;
   align-content:flex-start;
   padding-right:2px;
-  max-height:calc(var(--mobile-vh, 100vh) - var(--mobile-top-h) - 80px);
+  max-height:none;
 }
 body.mobile-ui .tabPanel > *{
-  min-height:48px;
+  min-height:40px;
 }
 body.mobile-ui .pill{
-  min-height:48px;
-  border-radius:16px;
+  min-height:40px;
+  border-radius:12px;
   white-space:normal;
 }
 body.mobile-ui .btn{
-  min-height:48px;
-  border-radius:16px;
-  padding:11px 14px;
-  font-size:15px;
+  min-height:40px;
+  border-radius:12px;
+  padding:8px 10px;
+  font-size:13px;
 }
 body.mobile-ui select,
 body.mobile-ui input[type="range"],
 body.mobile-ui input[type="text"],
 body.mobile-ui input[type="number"]{
-  font-size:16px;
+  font-size:15px;
 }
 body.mobile-ui .row{
   grid-template-rows:minmax(0,1fr);
   min-height:0;
   overflow:hidden;
+}
+body.mobile-ui.mobile-settings-open .row{
+  visibility:hidden;
+  pointer-events:none;
 }
 body.mobile-ui .status{
   display:none;
@@ -858,16 +872,16 @@ body.mobile-ui .phraseNameLine{
   align-items:stretch;
 }
 body.mobile-ui .phraseNameInput{
-  min-height:48px;
-  font-size:16px;
+  min-height:40px;
+  font-size:15px;
 }
 body.mobile-ui .phraseList{
   flex:1;
   max-height:none;
 }
 body.mobile-ui .phraseItem{
-  min-height:64px;
-  padding:12px;
+  min-height:52px;
+  padding:10px;
 }
 body.mobile-ui .panel{
   min-height:0;
@@ -876,32 +890,41 @@ body.mobile-ui .panel{
   overscroll-behavior:contain;
 }
 body.mobile-ui .panelHeader{
-  padding:10px 12px;
+  padding:8px 10px;
   position:sticky;
   top:0;
   z-index:3;
 }
 body.mobile-ui .panelHeader .title{
-  font-size:15px;
+  font-size:14px;
 }
 body.mobile-ui .panelHeader .pos{
-  font-size:11px;
-  padding:5px 8px;
+  font-size:10px;
+  padding:4px 6px;
 }
 body.mobile-ui .canvasWrap{
-  gap:8px;
+  gap:6px;
   min-height:max-content;
   height:auto;
   flex:1 0 auto;
+  padding:8px;
 }
 body.mobile-ui .pitchRulerPad,
 body.mobile-ui #pitchSide{
-  width:76px;
-  flex:0 0 76px;
+  width:64px;
+  flex:0 0 64px;
 }
 body.mobile-ui .melodyFlex{
   min-height:0;
   overflow:visible;
+}
+body.mobile-ui .subHeader{
+  margin-top:6px;
+  margin-bottom:4px;
+  padding:6px 8px;
+}
+body.mobile-ui .subtitle{
+  font-size:13px;
 }
 body.mobile-ui #melodyCanvas,
 body.mobile-ui #pitchCanvas,
@@ -910,10 +933,10 @@ body.mobile-ui #rulerCanvas{
   touch-action:none;
 }
 body.mobile-ui.mobile-view-chords .melodyFlex{
-  flex:0 0 112px;
+  flex:0 0 92px;
 }
 body.mobile-ui.mobile-view-chords .subHeader{
-  margin-top:8px;
+  margin-top:6px;
 }
 body.mobile-ui #mobileEditorDock{
   display:flex;
@@ -922,13 +945,39 @@ body.mobile-ui #mobileEditorDock{
   right:8px;
   bottom:8px;
   z-index:11520;
-  padding:10px;
+  padding:8px;
   flex-direction:column;
-  gap:10px;
+  gap:6px;
   pointer-events:auto;
-  max-height:min(36vh, 300px);
+  max-height:min(24vh, 180px);
   overflow:auto;
   overscroll-behavior:contain;
+}
+body.mobile-ui .mobileInspector{
+  gap:4px;
+}
+body.mobile-ui .mobileInspectorTitle{
+  font-size:13px;
+}
+body.mobile-ui:not(.mobile-portrait) .mobileInspectorMeta{
+  display:none;
+}
+body.mobile-ui .mobileInspectorRow{
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0,1fr));
+  gap:6px;
+}
+body.mobile-ui .mobileToolRow.active{
+  display:grid;
+  grid-template-columns:repeat(4, minmax(0,1fr));
+  gap:6px;
+}
+body.mobile-ui .mobileToolBtn,
+body.mobile-ui .mobileQuickBtn{
+  min-width:0;
+  min-height:38px;
+  padding:8px 6px;
+  font-size:12px;
 }
 body.mobile-ui.mobile-settings-open #mobileEditorDock,
 body.mobile-ui.mobile-phrase-open #mobileEditorDock{
@@ -965,10 +1014,10 @@ body.mobile-ui .chordPickerWindow{
   padding:16px 14px 18px;
 }
 body.mobile-ui .chordPickerGrid{
-  grid-template-columns:repeat(auto-fill, minmax(86px, 1fr));
+  grid-template-columns:repeat(auto-fill, minmax(74px, 1fr));
 }
 body.mobile-ui .chordPickBtn{
-  min-height:52px;
+  min-height:42px;
   display:flex;
   align-items:center;
   justify-content:center;
@@ -1001,14 +1050,21 @@ body.mobile-ui.mobile-portrait .mobileInspectorMeta{
 }
 body.mobile-ui.mobile-portrait .mobileToolBtn,
 body.mobile-ui.mobile-portrait .mobileQuickBtn{
-  min-width:64px;
+  min-width:0;
 }
 body.mobile-ui.mobile-portrait .mobileNavBtn,
 body.mobile-ui.mobile-portrait .transportFixed .btn,
 body.mobile-ui.mobile-portrait .transportFixed .pill,
 body.mobile-ui.mobile-portrait .btn,
 body.mobile-ui.mobile-portrait .pill{
-  min-height:44px;
+  min-height:40px;
+}
+body.mobile-ui:not(.mobile-portrait) #mobileEditorDock{
+  max-height:112px;
+}
+body.mobile-ui:not(.mobile-portrait) .phraseToolbar,
+body.mobile-ui:not(.mobile-portrait) .phraseStorageLine{
+  grid-template-columns:repeat(3, minmax(0,1fr));
 }
 
 @media (max-width: 1280px){
@@ -1799,11 +1855,12 @@ body.mobile-ui.mobile-portrait .pill{
       return false;
     }
     const topH = topArea ? Math.ceil(topArea.getBoundingClientRect().height) : 0;
-    const dockH = (mobileEditorDock && getComputedStyle(mobileEditorDock).display !== "none")
+    const dockVisible = !mobileUI.settingsOpen && !mobileUI.phraseOpen;
+    const dockH = (dockVisible && mobileEditorDock && getComputedStyle(mobileEditorDock).display !== "none")
       ? Math.ceil(mobileEditorDock.getBoundingClientRect().height)
       : 0;
-    const nextTop = `${Math.max(96, topH)}px`;
-    const nextBottom = `${Math.max(116, dockH)}px`;
+    const nextTop = `${Math.max(72, topH)}px`;
+    const nextBottom = `${Math.max(0, dockH)}px`;
     const prevTop = document.body.style.getPropertyValue("--mobile-top-h");
     const prevBottom = document.body.style.getPropertyValue("--mobile-bottom-h");
     document.body.style.setProperty("--mobile-top-h", nextTop);
