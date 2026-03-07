@@ -14,6 +14,9 @@
       --text:#dbe7ff;
       --muted:#8aa0c7;
       --acc:#7c3aed;
+      --scrollbar-size:8px;
+      --scrollbar-thumb: rgba(170,190,220,.16);
+      --scrollbar-thumb-hover: rgba(170,190,220,.28);
       --tab-panel-h:110px;
       --shadow: 0 12px 30px rgba(0,0,0,.35);
       --r:16px;
@@ -249,32 +252,53 @@
     }
     .status b{color:var(--text)}
   
-    /* Hide scrollbar on ruler (but keep it scrollable) */
-    #rulerScroll{scrollbar-width:none;-ms-overflow-style:none;}
-    #rulerScroll::-webkit-scrollbar{width:0;height:0;display:none;}
-
-
-    /* Hide scrollbar on melody roll (but keep it scrollable) */
-    #melodyScroll{scrollbar-width:none;-ms-overflow-style:none;}
-    #melodyScroll::-webkit-scrollbar{width:0;height:0;display:none;}
-    #melodyScroll.vscroll-enabled{scrollbar-width:none;-ms-overflow-style:none;}
-    #melodyScroll.vscroll-enabled::-webkit-scrollbar{width:0;height:0;display:none;}
-    #pitchSide{scrollbar-width:none;-ms-overflow-style:none;}
-    #pitchSide::-webkit-scrollbar{width:0;height:0;display:none;}
-    #chordScroll{
+    .scrollX,
+    #pitchSide,
+    .phraseList,
+    .chordPickerWindow,
+    .tabPanel[data-tab-panel="random"],
+    .transportFixed,
+    .tabBar{
       scrollbar-width:thin;
-      scrollbar-color: rgba(170,190,220,.22) transparent;
+      scrollbar-color: var(--scrollbar-thumb) transparent;
     }
-    #chordScroll::-webkit-scrollbar{height:8px;}
-    #chordScroll::-webkit-scrollbar-track{background:transparent;}
-    #chordScroll::-webkit-scrollbar-thumb{
+    .scrollX::-webkit-scrollbar,
+    #pitchSide::-webkit-scrollbar,
+    .phraseList::-webkit-scrollbar,
+    .chordPickerWindow::-webkit-scrollbar,
+    .tabPanel[data-tab-panel="random"]::-webkit-scrollbar,
+    .transportFixed::-webkit-scrollbar,
+    .tabBar::-webkit-scrollbar{
+      width:var(--scrollbar-size);
+      height:var(--scrollbar-size);
+    }
+    .scrollX::-webkit-scrollbar-track,
+    #pitchSide::-webkit-scrollbar-track,
+    .phraseList::-webkit-scrollbar-track,
+    .chordPickerWindow::-webkit-scrollbar-track,
+    .tabPanel[data-tab-panel="random"]::-webkit-scrollbar-track,
+    .transportFixed::-webkit-scrollbar-track,
+    .tabBar::-webkit-scrollbar-track{background:transparent;}
+    .scrollX::-webkit-scrollbar-thumb,
+    #pitchSide::-webkit-scrollbar-thumb,
+    .phraseList::-webkit-scrollbar-thumb,
+    .chordPickerWindow::-webkit-scrollbar-thumb,
+    .tabPanel[data-tab-panel="random"]::-webkit-scrollbar-thumb,
+    .transportFixed::-webkit-scrollbar-thumb,
+    .tabBar::-webkit-scrollbar-thumb{
       border-radius:999px;
-      background: rgba(170,190,220,.16);
+      background: var(--scrollbar-thumb);
       border:2px solid transparent;
       background-clip:padding-box;
     }
-    #chordScroll:hover::-webkit-scrollbar-thumb{
-      background: rgba(170,190,220,.28);
+    .scrollX:hover::-webkit-scrollbar-thumb,
+    #pitchSide:hover::-webkit-scrollbar-thumb,
+    .phraseList:hover::-webkit-scrollbar-thumb,
+    .chordPickerWindow:hover::-webkit-scrollbar-thumb,
+    .tabPanel[data-tab-panel="random"]:hover::-webkit-scrollbar-thumb,
+    .transportFixed:hover::-webkit-scrollbar-thumb,
+    .tabBar:hover::-webkit-scrollbar-thumb{
+      background: var(--scrollbar-thumb-hover);
       border:2px solid transparent;
       background-clip:padding-box;
     }
@@ -463,6 +487,12 @@ body{
 .tabPanel{
   width:100%;
   min-height:calc(var(--tab-panel-h) - 16px);
+}
+.tabPanel[data-tab-panel="random"]{
+  max-height:calc(var(--tab-panel-h) - 16px);
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding-right:4px;
 }
 .row{
   margin-top:0;
@@ -686,6 +716,23 @@ body{
               <option value="rock_power">Rock Power Lead</option>
               <option value="rock_bass">Rock Bass</option>
             </select>
+          </label>
+          <label class="pill">Chord
+            <select id="chordTimbre">
+              <option value="saw_pad">Saw Pad</option>
+              <option value="warm_tri">Warm Triangle</option>
+              <option value="soft_sine">Soft Sine</option>
+              <option value="square_organ">Square Organ</option>
+              <option value="fm_glass">FM Glass</option>
+            </select>
+          </label>
+          <label class="pill">Chord Vol
+            <input id="chordVol" type="range" min="0" max="100" value="100" style="width:110px">
+            <span id="chordVolLabel">100%</span>
+          </label>
+          <label class="pill">Drum Vol
+            <input id="drumVol" type="range" min="0" max="100" value="100" style="width:110px">
+            <span id="drumVolLabel">100%</span>
           </label>
           <button id="btnToggleDrums" class="btn">Drums: ON</button>
           <button id="btnToggleChords" class="btn">Chords: ON</button>
@@ -1079,6 +1126,11 @@ body{
   const tempoLabel = document.getElementById("tempoLabel");
   const masterVol = document.getElementById("masterVol");
   const masterVolLabel = document.getElementById("masterVolLabel");
+  const chordTimbre = document.getElementById("chordTimbre");
+  const chordVol = document.getElementById("chordVol");
+  const chordVolLabel = document.getElementById("chordVolLabel");
+  const drumVol = document.getElementById("drumVol");
+  const drumVolLabel = document.getElementById("drumVolLabel");
   const bars = document.getElementById("bars");
   const barsLabel = document.getElementById("barsLabel");
   const snapSelect = document.getElementById("snapSelect");
@@ -1442,6 +1494,7 @@ body{
   
   // Melody synth (timbre selectable)
   let melodyTimbreValue = (localStorage.getItem("melodyTimbre") || "saw");
+  let chordTimbreValue = (localStorage.getItem("chordTimbre") || "saw_pad");
   let lead = null;
 
   function cloneToneOptions(opts){
@@ -1549,6 +1602,61 @@ body{
     }
   }
 
+  function getChordVoicePreset(v){
+    switch(String(v || "saw_pad").toLowerCase()){
+      case "warm_tri":
+        return {
+          voice: Tone.Synth,
+          options: {
+            oscillator:{ type:"triangle" },
+            envelope:{ attack:0.01, decay:0.12, sustain:0.42, release:0.28 }
+          },
+          volumeDb: -5
+        };
+      case "soft_sine":
+        return {
+          voice: Tone.Synth,
+          options: {
+            oscillator:{ type:"sine" },
+            envelope:{ attack:0.012, decay:0.1, sustain:0.5, release:0.3 }
+          },
+          volumeDb: -4
+        };
+      case "square_organ":
+        return {
+          voice: Tone.Synth,
+          options: {
+            oscillator:{ type:"square" },
+            envelope:{ attack:0.004, decay:0.05, sustain:0.62, release:0.18 }
+          },
+          volumeDb: -7
+        };
+      case "fm_glass":
+        return {
+          voice: Tone.FMSynth,
+          options: {
+            harmonicity: 1.5,
+            modulationIndex: 4,
+            oscillator:{ type:"sine" },
+            envelope:{ attack:0.006, decay:0.18, sustain:0.28, release:0.24 },
+            modulation:{ type:"triangle" },
+            modulationEnvelope:{ attack:0.004, decay:0.12, sustain:0.18, release:0.2 }
+          },
+          volumeDb: -8
+        };
+      case "saw_pad":
+      default:
+        return {
+          voice: Tone.Synth,
+          options: {
+            oscillator:{ type:"sawtooth" },
+            envelope:{ attack:0.008, decay:0.12, sustain:0.36, release:0.22 }
+          },
+          volumeDb: -6
+        };
+    }
+  }
+
   function buildLead(){
     try{ if (lead) lead.dispose(); }catch(e){}
     const preset = getMelodyVoicePreset(melodyTimbreValue);
@@ -1561,12 +1669,34 @@ body{
   // ======== Stable Playback Engine (single scheduler + PolySynth voice reuse) ========
   let polyLead = null;
   let polyChord = null;
+  let chordSynth = null;
+
+  function rebuildChordSynths(){
+    const preset = getChordVoicePreset(chordTimbreValue);
+    try { if (polyChord) polyChord.dispose(); } catch(e){}
+    try { if (chordSynth) chordSynth.dispose(); } catch(e){}
+
+    polyChord = new Tone.PolySynth({
+      maxPolyphony: 12,
+      voice: preset.voice,
+      options: cloneToneOptions(preset.options)
+    });
+    polyChord.chain(reverb, limiter, Tone.Destination);
+
+    chordSynth = new Tone.PolySynth({
+      maxPolyphony: 8,
+      voice: preset.voice,
+      options: cloneToneOptions(preset.options)
+    });
+    chordSynth.chain(reverb, limiter, Tone.Destination);
+
+    applyChordVolumePct(chordVol ? chordVol.value : 100, false);
+  }
 
   function rebuildPolySynths(){
     const timbreSel = document.getElementById("melodyTimbre");
     const preset = getMelodyVoicePreset(timbreSel ? timbreSel.value : "saw");
     try { if (polyLead) polyLead.dispose(); } catch(e){}
-    try { if (polyChord) polyChord.dispose(); } catch(e){}
     // Limit voices to prevent unbounded OscillatorNode growth
     polyLead = new Tone.PolySynth({
       maxPolyphony: 8,
@@ -1575,12 +1705,7 @@ body{
     });
     try{ polyLead.volume.value = preset.volumeDb; }catch(e){}
     polyLead.chain(delay, reverb, limiter, Tone.Destination);
-
-    polyChord = new Tone.PolySynth({
-      maxPolyphony: 12,
-      voice: Tone.Synth,
-      options: { oscillator:{ type: "sawtooth" }, envelope:{ attack:0.01, decay:0.12, sustain:0.35, release:0.18 } }
-    }).toDestination();
+    rebuildChordSynths();
   }
   rebuildPolySynths();
 
@@ -1764,11 +1889,6 @@ body{
     }
   }
 
-const chordSynth = new Tone.PolySynth(Tone.Synth, {
-    oscillator:{ type:"triangle" },
-    envelope:{ attack:0.01, decay:0.12, sustain:0.35, release:0.25 }
-  });
-
   let kick = null;
   let snare = null;
   let hat = null;
@@ -1810,10 +1930,10 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     hat.chain(limiter, Tone.Destination);
     crash.chain(reverb, limiter, Tone.Destination);
     tom.chain(reverb, limiter, Tone.Destination);
+
+    applyDrumVolumePct(drumVol ? drumVol.value : 100, false);
   }
   buildDrumSynths();
-
-  chordSynth.chain(reverb, limiter, Tone.Destination);
 
   
   // Separate synth for live MIDI monitoring (timbre synced with melody)
@@ -1837,11 +1957,11 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
   let drumPart  = null;
 
   // ======== UTIL ========
-  const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
-  const deepClone = (x)=>JSON.parse(JSON.stringify(x));
-  const snapSteps = ()=>Number(snapSelect.value);
-  const quant = (step)=> Math.round(step / snapSteps()) * snapSteps();
-  const setStatus = (msg)=> statusLeft.innerHTML = `Status: <b>${msg}</b>`;
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+  function deepClone(x){ return JSON.parse(JSON.stringify(x)); }
+  function snapSteps(){ return Number(snapSelect.value); }
+  function quant(step){ return Math.round(step / snapSteps()) * snapSteps(); }
+  function setStatus(msg){ statusLeft.innerHTML = `Status: <b>${msg}</b>`; }
 
   function masterPctToDb(pct){
     const p = clamp(Number(pct) || 0, 0, 100);
@@ -1849,6 +1969,11 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     const gain = Math.pow(p / 100, 2);
     if (Tone && typeof Tone.gainToDb === "function") return Tone.gainToDb(gain);
     return 20 * Math.log10(gain);
+  }
+  function relativePctToDb(pct, baseDb=0){
+    const p = clamp(Number(pct) || 0, 0, 100);
+    if (p <= 0) return -Infinity;
+    return baseDb + masterPctToDb(p);
   }
   function setMasterVolumePct(pct, announce=false){
     const p = clamp(Number(pct) || 0, 0, 100);
@@ -1862,6 +1987,40 @@ const chordSynth = new Tone.PolySynth(Tone.Synth, {
     }catch(e){}
     try{ localStorage.setItem("masterVolumePct", String(p)); }catch(e){}
     if (announce) setStatus(`Master volume: ${p}%`);
+  }
+  function applySynthVolume(target, db){
+    if (!target || !target.volume) return;
+    try{
+      if (typeof target.volume.rampTo === "function"){
+        target.volume.rampTo(db, 0.02);
+      }else{
+        target.volume.value = db;
+      }
+    }catch(e){}
+  }
+  function applyChordVolumePct(pct, announce=false){
+    const p = clamp(Number(pct) || 0, 0, 100);
+    if (chordVol) chordVol.value = String(p);
+    if (chordVolLabel) chordVolLabel.textContent = `${p}%`;
+    const baseDb = getChordVoicePreset(chordTimbreValue).volumeDb;
+    const db = relativePctToDb(p, baseDb);
+    applySynthVolume(polyChord, db);
+    applySynthVolume(chordSynth, db);
+    try{ localStorage.setItem("chordVolumePct", String(p)); }catch(e){}
+    if (announce) setStatus(`Chord volume: ${p}%`);
+  }
+  function applyDrumVolumePct(pct, announce=false){
+    const p = clamp(Number(pct) || 0, 0, 100);
+    if (drumVol) drumVol.value = String(p);
+    if (drumVolLabel) drumVolLabel.textContent = `${p}%`;
+    const db = relativePctToDb(p, 0);
+    applySynthVolume(kick, db);
+    applySynthVolume(snare, db);
+    applySynthVolume(hat, db);
+    applySynthVolume(crash, db);
+    applySynthVolume(tom, db);
+    try{ localStorage.setItem("drumVolumePct", String(p)); }catch(e){}
+    if (announce) setStatus(`Drum volume: ${p}%`);
   }
 
   function stepToX(step){ return step * ui.pxPerStep; }
@@ -4956,7 +5115,7 @@ function hitNote(mx,my){
       const delta = snapSteps() * (e.key === "ArrowRight" ? 1 : -1);
       // Only create notes when moving forward; backward just moves the cursor
       if (delta > 0 && stepHeld.size) pushUndo("Step input");
-      setStepCursor(stepCursor + delta);
+      setStepCursor(stepCursor + delta, true);
       setStatus(`Step cursor: ${Math.floor(stepCursor/16)+1}:${Math.floor((stepCursor%16)/4)+1}:${(stepCursor%4)+1}`);
       return;
     }
@@ -5471,6 +5630,28 @@ function hitNote(mx,my){
     });
   }
 
+  if (chordTimbre){
+    chordTimbre.value = chordTimbreValue;
+    chordTimbre.addEventListener("change", ()=>{
+      chordTimbreValue = chordTimbre.value || "saw_pad";
+      try{ localStorage.setItem("chordTimbre", chordTimbreValue); }catch(e){}
+      try{ rebuildChordSynths(); }catch(e){}
+      setStatus(`Chord timbre: ${chordTimbre.options[chordTimbre.selectedIndex]?.text || chordTimbreValue}`);
+    });
+  }
+
+  if (chordVol){
+    chordVol.addEventListener("input", ()=>{
+      applyChordVolumePct(chordVol.value, false);
+    });
+  }
+
+  if (drumVol){
+    drumVol.addEventListener("input", ()=>{
+      applyDrumVolumePct(drumVol.value, false);
+    });
+  }
+
 
   pitchThresh.addEventListener("input", ()=>{
     pitchRmsThreshold = Math.max(0, Math.min(0.30, parseFloat(pitchThresh.value) || 0));
@@ -5769,7 +5950,37 @@ function hitNote(mx,my){
 
 
   
-  function setStepCursor(next){
+  function ensureStepCursorVisible(){
+    if (!melodyScroll || !rulerScroll || !chordScroll) return;
+    const maxLeft = Math.max(0, melodyScroll.scrollWidth - melodyScroll.clientWidth);
+    if (maxLeft <= 0) return;
+
+    const cursorX = stepToX(stepCursor);
+    const pad = clamp(Math.round(melodyScroll.clientWidth * 0.14), 32, 120);
+    const leftEdge = melodyScroll.scrollLeft + pad;
+    const rightEdge = melodyScroll.scrollLeft + melodyScroll.clientWidth - pad;
+    let target = melodyScroll.scrollLeft;
+
+    if (cursorX < leftEdge){
+      target = clamp(cursorX - pad, 0, maxLeft);
+    }else if (cursorX > rightEdge){
+      target = clamp(cursorX - melodyScroll.clientWidth + pad, 0, maxLeft);
+    }
+
+    if (target === melodyScroll.scrollLeft) return;
+
+    markUserScroll();
+    syncingScroll = true;
+    try{
+      melodyScroll.scrollLeft = target;
+      chordScroll.scrollLeft = target;
+      rulerScroll.scrollLeft = target;
+    }finally{
+      syncingScroll = false;
+    }
+  }
+
+  function setStepCursor(next, keepVisible=false){
     stepCursor = clamp(quant(next), 0, TOTAL_STEPS-1);
     // Extend/preview held notes as cursor moves
     if (stepInput && stepHeld.size){
@@ -5790,7 +6001,8 @@ function hitNote(mx,my){
       }
       rebuildAudio();
     }
-renderAll();
+    if (keepVisible) ensureStepCursorVisible();
+    renderAll();
   }
 
   function finalizeStepNote(midi){
@@ -5893,7 +6105,7 @@ renderAll();
   function exportSong(){
     return {
       format: "piano-roll-song",
-      version: 7,
+      version: 8,
       meta: { title:"My Song", author:"You", created:new Date().toISOString() },
       transport: { bpm: Math.round(Tone.Transport.bpm.value), timeSignature:[4,4], bars:TOTAL_BARS, stepsPerBar:STEPS_PER_BAR },
       scale: { root: scaleRoot.value, type: scaleType.value },
@@ -5910,6 +6122,12 @@ renderAll();
         follow: ui.follow,
         autoRetune: ui.autoRetune,
         masterVolumePct: Number(masterVol.value || 85),
+        sound: {
+          melodyTimbre: melodyTimbreValue,
+          chordTimbre: chordTimbreValue,
+          chordVolumePct: Number(chordVol?.value || 100),
+          drumVolumePct: Number(drumVol?.value || 100)
+        },
         randomize: {
           posMode: randPosMode.value,
           rhythmTemplate: randRhythmTemplate?.value || "auto",
@@ -5995,6 +6213,23 @@ renderAll();
     if (typeof data.ui?.masterVolumePct === "number"){
       setMasterVolumePct(data.ui.masterVolumePct, false);
     }
+    if (data.ui?.sound){
+      const snd = data.ui.sound;
+      if (typeof snd.melodyTimbre === "string"){
+        melodyTimbreValue = snd.melodyTimbre || "saw";
+        if (melodyTimbre) melodyTimbre.value = melodyTimbreValue;
+      }
+      if (typeof snd.chordTimbre === "string"){
+        chordTimbreValue = snd.chordTimbre || "saw_pad";
+        if (chordTimbre) chordTimbre.value = chordTimbreValue;
+      }
+      if (typeof snd.chordVolumePct === "number"){
+        applyChordVolumePct(snd.chordVolumePct, false);
+      }
+      if (typeof snd.drumVolumePct === "number"){
+        applyDrumVolumePct(snd.drumVolumePct, false);
+      }
+    }
     if (data.ui?.randomize){
       if (typeof data.ui.randomize.posMode === "string") randPosMode.value = data.ui.randomize.posMode;
       if (typeof data.ui.randomize.rhythmTemplate === "string") randRhythmTemplate.value = data.ui.randomize.rhythmTemplate;
@@ -6068,6 +6303,12 @@ renderAll();
       chord: String(c.chord || "Em")
     })).sort((a,b)=>a.start-b.start);
 
+    try{ buildLead(); }catch(e){}
+    try{ buildMonitorSynth(); }catch(e){}
+    try{ rebuildPolySynths(); }catch(e){}
+    try{ buildDrumSynths(); }catch(e){}
+    applyChordVolumePct(chordVol ? chordVol.value : 100, false);
+    applyDrumVolumePct(drumVol ? drumVol.value : 100, false);
     resizeCanvases();
     rebuildAudio();
     renderAll();
@@ -6144,8 +6385,13 @@ renderAll();
     if (chordGenKey && ROOT_PC[scaleRoot.value] != null) chordGenKey.value = scaleRoot.value;
     if (chordGenMode) chordGenMode.value = (scaleType.value === "natural_minor") ? "natural_minor" : "major";
     const storedMaster = Number(localStorage.getItem("masterVolumePct"));
+    const storedChordVol = Number(localStorage.getItem("chordVolumePct"));
+    const storedDrumVol = Number(localStorage.getItem("drumVolumePct"));
     const initialMaster = Number.isFinite(storedMaster) ? storedMaster : Number(masterVol.value || 85);
     setMasterVolumePct(initialMaster, false);
+    applyChordVolumePct(Number.isFinite(storedChordVol) ? storedChordVol : Number(chordVol?.value || 100), false);
+    applyDrumVolumePct(Number.isFinite(storedDrumVol) ? storedDrumVol : Number(drumVol?.value || 100), false);
+    if (chordTimbre) chordTimbre.value = chordTimbreValue;
 
     ui.pxPerStep = Number(zoom.value);
     ui.rollHeightPct = clamp(Number(rollHeightPct?.value || 100), 70, 200);
@@ -6312,7 +6558,8 @@ renderAll();
   sleepSprite.src = SLEEP_SPRITE_SRC;
 
 
-  // ===== Idle/Sleep state (no UNDO/REDO-able action for a while) =====
+  // ===== Idle/Think/Sleep state =====
+  const THINK_TIMEOUT_MS = 35 * 1000; // short inactive pause before sleeping
   const IDLE_TIMEOUT_MS = 10 * 60 * 1000; // ~10 minutes
   let lastActivityMs = Date.now();
 
@@ -6334,6 +6581,11 @@ renderAll();
 
   function isSleepingNow() {
     return (Date.now() - lastActivityMs) >= IDLE_TIMEOUT_MS;
+  }
+
+  function isThinkingNow() {
+    const idleMs = Date.now() - lastActivityMs;
+    return idleMs >= THINK_TIMEOUT_MS && idleMs < IDLE_TIMEOUT_MS;
   }
 
 function isTransportPlaying() {
@@ -6385,13 +6637,56 @@ function isTransportPlaying() {
   // Animation speed:
   // at 120 BPM -> about 6 fps (slower than before), and scales with tempo.
   function currentFps(mode) {
-    // mode: 'play' | 'idle' | 'sleep'
+    // mode: 'play' | 'idle' | 'think' | 'sleep' | 'drag'
     if (mode === 'drag') return 10;
+    if (mode === 'think') return 5;
     if (mode === 'sleep') return 3; // sleepy loop
     if (mode !== 'play') return 4; // gentle idle
     const bpm = getBpm();
     const fps = bpm / 20; // 120 -> 6fps
     return Math.max(3, Math.min(14, fps));
+  }
+
+  function drawThinkBubble(now) {
+    const bobX = Math.sin(now * 0.0022) * 2.5;
+    const bobY = Math.sin(now * 0.0034) * 1.8;
+    const pulse = 1 + Math.sin(now * 0.0046) * 0.04;
+    const anchorX = 114;
+    const anchorY = 8;
+
+    ctx.save();
+    ctx.translate(0, bobY);
+
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.beginPath();
+    ctx.ellipse(anchorX + bobX, anchorY + 8, 14 * pulse, 10 * pulse, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#f7fbff';
+    ctx.strokeStyle = '#20304a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(anchorX - 2 + bobX, anchorY + 5, 14 * pulse, 10 * pulse, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(anchorX - 16 + bobX * 0.45, anchorY + 24, 3.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(anchorX - 24 + bobX * 0.25, anchorY + 33, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#4b5870';
+    ctx.beginPath();
+    ctx.arc(anchorX - 7 + bobX, anchorY + 5, 1.8, 0, Math.PI * 2);
+    ctx.arc(anchorX - 2 + bobX, anchorY + 5, 1.8, 0, Math.PI * 2);
+    ctx.arc(anchorX + 3 + bobX, anchorY + 5, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
   function tick(now) {
@@ -6404,8 +6699,9 @@ function isTransportPlaying() {
 
     const playing = isTransportPlaying();
     const sleeping = (!playing) && isSleepingNow();
+    const thinking = (!playing) && (!sleeping) && isThinkingNow();
     const dragging = !!drag;
-    const mode = dragging ? 'drag' : (playing ? 'play' : (sleeping ? 'sleep' : 'idle'));
+    const mode = dragging ? 'drag' : (playing ? 'play' : (sleeping ? 'sleep' : (thinking ? 'think' : 'idle')));
     const velBlend = 1 - Math.exp(-dt * 18);
     const settleBlend = 1 - Math.exp(-dt * 12);
 
@@ -6447,12 +6743,12 @@ function isTransportPlaying() {
       acc -= steps * spf;
 
       const img = (mode === 'play') ? playSprite : ((mode === 'sleep') ? sleepSprite : idleSprite);
-      const fc = (mode === 'drag') ? 1 : frameCountFor(img, (mode === 'idle') ? 8 : 4);
+      const fc = (mode === 'drag') ? 1 : frameCountFor(img, ((mode === 'idle') || (mode === 'think')) ? 8 : 4);
       frame = (frame + steps) % Math.max(1, fc);
     }
 
     const img = (mode === 'play') ? playSprite : ((mode === 'sleep') ? sleepSprite : idleSprite);
-    const fc = (mode === 'drag') ? 1 : frameCountFor(img, (mode === 'idle') ? 8 : 4);
+    const fc = (mode === 'drag') ? 1 : frameCountFor(img, ((mode === 'idle') || (mode === 'think')) ? 8 : 4);
 
     if (img.complete && img.naturalWidth) {
       ctx.clearRect(0, 0, 128, 128);
@@ -6475,6 +6771,17 @@ function isTransportPlaying() {
         ctx.scale(dragAnim.stretchX, dragAnim.stretchY);
         ctx.drawImage(img, fx, 0, frameW, frameH, -64, -64, 128, 128);
         ctx.restore();
+      } else if (mode === 'think') {
+        const bobY = Math.sin(now * 0.0034) * 1.6;
+        const tilt = Math.sin(now * 0.0023) * 0.045;
+
+        ctx.save();
+        ctx.translate(64, 64 + bobY);
+        ctx.rotate(tilt);
+        ctx.drawImage(img, fx, 0, frameW, frameH, -64, -64, 128, 128);
+        ctx.restore();
+
+        drawThinkBubble(now);
       } else {
         ctx.drawImage(img, fx, 0, frameW, frameH, 0, 0, 128, 128);
       }
