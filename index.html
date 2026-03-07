@@ -18,6 +18,8 @@
       --scrollbar-thumb: rgba(170,190,220,.16);
       --scrollbar-thumb-hover: rgba(170,190,220,.28);
       --tab-panel-h:110px;
+      --app-vh:100vh;
+      --mobile-vh:100vh;
       --shadow: 0 12px 30px rgba(0,0,0,.35);
       --r:16px;
     }
@@ -437,7 +439,7 @@ body{
 .wrap{
   max-width:none;
   width:100vw;
-  height:100vh;
+  height:var(--app-vh, 100vh);
   margin:0;
   padding:10px;
   display:grid;
@@ -722,7 +724,7 @@ body.mobile-ui .toolbar{
   transition:max-height .18s ease, box-shadow .18s ease, transform .18s ease;
 }
 body.mobile-ui.mobile-settings-open .toolbar{
-  max-height:calc(100vh - 16px);
+  max-height:calc(var(--mobile-vh, 100vh) - 16px);
   box-shadow:0 24px 48px rgba(0,0,0,.5);
 }
 body.mobile-ui .mobileOnly{
@@ -769,7 +771,7 @@ body.mobile-ui.mobile-settings-open .tabBar{
 body.mobile-ui.mobile-settings-open .tabPanels{
   display:block;
   min-height:0;
-  height:calc(100vh - var(--mobile-top-h) - 56px);
+  height:calc(var(--mobile-vh, 100vh) - var(--mobile-top-h) - 56px);
   max-height:none;
   overflow:hidden;
   padding:10px;
@@ -788,7 +790,7 @@ body.mobile-ui.mobile-settings-open .tabPanel.active{
   overflow:auto;
   align-content:flex-start;
   padding-right:2px;
-  max-height:calc(100vh - var(--mobile-top-h) - 80px);
+  max-height:calc(var(--mobile-vh, 100vh) - var(--mobile-top-h) - 80px);
 }
 body.mobile-ui .tabPanel > *{
   min-height:48px;
@@ -819,7 +821,7 @@ body.mobile-ui .status{
 body.mobile-ui .mainLayout,
 body.mobile-ui .mainLayout.sidebar-collapsed{
   grid-template-columns:minmax(0,1fr);
-  height:calc(100vh - var(--mobile-top-h) - var(--mobile-bottom-h) - 16px);
+  height:calc(var(--mobile-vh, 100vh) - var(--mobile-top-h) - var(--mobile-bottom-h) - 16px);
 }
 body.mobile-ui .leftDock{
   display:none;
@@ -918,7 +920,7 @@ body.mobile-ui .opsPanel{
   left:8px;
   right:8px;
   width:auto;
-  max-height:calc(100vh - var(--mobile-top-h) - var(--mobile-bottom-h) - 16px);
+  max-height:calc(var(--mobile-vh, 100vh) - var(--mobile-top-h) - var(--mobile-bottom-h) - 16px);
 }
 body.mobile-ui .chordPickerOverlay{
   inset:0;
@@ -1688,6 +1690,8 @@ body.mobile-ui.mobile-portrait #mobileRotateHint{
       didMove: false
     }
   };
+  let mobileViewportMetricsRaf = 0;
+  let mobileViewportRefitPending = false;
 
   function applySidebarCollapsedState(){
     if (!mainLayout || !phraseCard) return;
@@ -1711,6 +1715,67 @@ body.mobile-ui.mobile-portrait #mobileRotateHint{
 
   function isTouchPointerEvent(e){
     return !!(e && (e.pointerType === "touch" || e.pointerType === "pen"));
+  }
+
+  function currentViewportHeight(){
+    const vv = window.visualViewport;
+    return Math.max(
+      1,
+      Math.round(vv && vv.height ? vv.height : (window.innerHeight || document.documentElement.clientHeight || 0))
+    );
+  }
+
+  function detectMobileUILayout(){
+    const ua = navigator.userAgent || "";
+    const hasTouch = (navigator.maxTouchPoints || 0) > 0 || ("ontouchstart" in window);
+    const coarse = window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(any-pointer: coarse)").matches;
+    const noHover = window.matchMedia("(hover: none)").matches || window.matchMedia("(any-hover: none)").matches;
+    const mobileUA = /Android|iPhone|iPad|iPod|Mobile|Windows Phone|webOS/i.test(ua);
+    const shortEdge = Math.min(window.innerWidth || 0, currentViewportHeight());
+    const narrowLayout = shortEdge > 0 && shortEdge <= 980;
+    const touchLandscapePhone = hasTouch && (window.innerWidth || 0) <= 1100 && currentViewportHeight() <= 980;
+    return !!(mobileUA || (hasTouch && (coarse || noHover) && narrowLayout) || touchLandscapePhone);
+  }
+
+  function applyViewportHeightVars(){
+    const vh = currentViewportHeight();
+    document.documentElement.style.setProperty("--app-vh", `${vh}px`);
+    document.documentElement.style.setProperty("--mobile-vh", `${vh}px`);
+  }
+
+  function applyMobileViewportMetrics(){
+    applyViewportHeightVars();
+    if (!mobileUI.active){
+      document.body.style.removeProperty("--mobile-top-h");
+      document.body.style.removeProperty("--mobile-bottom-h");
+      return false;
+    }
+    const topH = topArea ? Math.ceil(topArea.getBoundingClientRect().height) : 0;
+    const dockH = (mobileEditorDock && getComputedStyle(mobileEditorDock).display !== "none")
+      ? Math.ceil(mobileEditorDock.getBoundingClientRect().height)
+      : 0;
+    const nextTop = `${Math.max(96, topH)}px`;
+    const nextBottom = `${Math.max(116, dockH)}px`;
+    const prevTop = document.body.style.getPropertyValue("--mobile-top-h");
+    const prevBottom = document.body.style.getPropertyValue("--mobile-bottom-h");
+    document.body.style.setProperty("--mobile-top-h", nextTop);
+    document.body.style.setProperty("--mobile-bottom-h", nextBottom);
+    return prevTop !== nextTop || prevBottom !== nextBottom;
+  }
+
+  function scheduleMobileViewportMetrics(refit=false){
+    mobileViewportRefitPending = mobileViewportRefitPending || !!refit;
+    if (mobileViewportMetricsRaf) return;
+    mobileViewportMetricsRaf = requestAnimationFrame(()=>{
+      mobileViewportMetricsRaf = 0;
+      const changed = applyMobileViewportMetrics();
+      const needsRefit = mobileViewportRefitPending;
+      mobileViewportRefitPending = false;
+      if (changed && needsRefit){
+        resizeCanvases();
+        renderAll();
+      }
+    });
   }
 
   function rememberTouchInteraction(){
@@ -1892,11 +1957,13 @@ body.mobile-ui.mobile-portrait #mobileRotateHint{
     if (mobileRotateHint){
       mobileRotateHint.setAttribute("aria-hidden", (!active || !mobileUI.portrait) ? "true" : "false");
     }
+    scheduleMobileViewportMetrics(true);
   }
 
   function refreshMobileMode(){
-    mobileUI.active = !!MOBILE_LAYOUT_MQ.matches;
-    mobileUI.portrait = window.innerHeight > window.innerWidth;
+    applyViewportHeightVars();
+    mobileUI.active = detectMobileUILayout();
+    mobileUI.portrait = currentViewportHeight() > window.innerWidth;
     if (!mobileUI.active){
       mobileUI.settingsOpen = false;
       mobileUI.phraseOpen = false;
@@ -6433,18 +6500,21 @@ function hitNote(mx,my){
     });
   }
 
-  window.addEventListener("resize", ()=>{
+  const handleViewportChange = ()=>{
     refreshMobileMode();
     resizeCanvases();
     renderAll();
     if (chordPickerState.open) refreshChordPickerUI();
-  });
+  };
+  window.addEventListener("resize", handleViewportChange);
   if (typeof MOBILE_LAYOUT_MQ.addEventListener === "function"){
     MOBILE_LAYOUT_MQ.addEventListener("change", ()=>{
-      refreshMobileMode();
-      resizeCanvases();
-      renderAll();
+      handleViewportChange();
     });
+  }
+  if (window.visualViewport && typeof window.visualViewport.addEventListener === "function"){
+    window.visualViewport.addEventListener("resize", handleViewportChange);
+    window.visualViewport.addEventListener("scroll", handleViewportChange);
   }
   window.addEventListener("keydown", (e)=>{
     if (e.key === "Escape" && opsPanelOpen){
