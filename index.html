@@ -3533,20 +3533,96 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
     }
 
     pushUndo("Randomize selected pitch");
+    const selected = Array.from(mel.sel.set).sort((a,b)=> (a.step - b.step) || (a.midi - b.midi) || (a.dur - b.dur));
+    const originalMidiMap = new Map(selected.map(n => [n, n.midi]));
     const scalePCs = getSelectedScalePCs();
-    let changed = 0;
-    for (const n of mel.sel.set){
-      const allowed = allowedPitchClassesAtStep(n.step, scalePCs);
-      const nextMidi = randomMidiFromAllowed(allowed, n.midi);
-      if (nextMidi !== n.midi){
-        n.midi = nextMidi;
-        changed++;
+    const weights = getPhraseRuleWeights();
+    const snap = snapSteps();
+    const cfg = {
+      start: Math.min(...selected.map(n => n.step)),
+      end: Math.max(...selected.map(n => n.step + n.dur)),
+      selectedNotes: selected
+    };
+    const centerMidi = estimatePhraseCenterMidi(cfg, scalePCs);
+    const { pitchSpan, rangeMinMidi, rangeMaxMidi } = getPhrasePitchMidiRange(centerMidi);
+    const pitchPoolAll = candidateMidisFromAllowed(scalePCs);
+    const pitchPool = pitchPoolAll.filter(m => m >= rangeMinMidi && m <= rangeMaxMidi);
+    const hasAltPitch = (midi)=>{
+      const pool = pitchPool.length ? pitchPool : pitchPoolAll;
+      for (const m of pool){
+        if (m !== midi) return true;
       }
+      return false;
+    };
+    const prev = notes
+      .filter(n => !mel.sel.set.has(n) && n.step < cfg.start)
+      .sort((a,b)=> (a.step - b.step) || (a.midi - b.midi));
+    let prevMidi = prev.length ? prev[prev.length - 1].midi : null;
+    const motifSpan = Math.max(snap, Math.min(STEPS_PER_BAR, cfg.end - cfg.start));
+    const motifMap = new Map();
+    const leapState = { dir: 0, size: 0 };
+    for (let i = 0; i < selected.length; i++){
+      const n = selected[i];
+      const relStep = n.step - cfg.start;
+      const relInMotif = ((relStep % motifSpan) + motifSpan) % motifSpan;
+      const motifKey = (Math.round(relInMotif / snap) * snap).toFixed(3);
+      const canRepeat = relStep >= motifSpan && motifMap.has(motifKey);
+      const repeatProb = weights.repeat / 10;
+      const repeatTargetMidi = (canRepeat && Math.random() < repeatProb) ? motifMap.get(motifKey) : null;
+      const prevBefore = prevMidi;
+      const isLast = (i === selected.length - 1);
+      let nextMidi = chooseMidiByPhraseRules(
+        n.step,
+        prevBefore,
+        centerMidi,
+        scalePCs,
+        leapState,
+        repeatTargetMidi,
+        isLast,
+        weights,
+        rangeMinMidi,
+        rangeMaxMidi
+      );
+      if (Number.isFinite(repeatTargetMidi) && Math.random() < 0.35){
+        nextMidi = mutateRepeatedMidi(nextMidi, scalePCs, rangeMinMidi, rangeMaxMidi);
+      }
+      if (nextMidi === n.midi && hasAltPitch(n.midi)){
+        for (let tries = 0; tries < 4 && nextMidi === n.midi; tries++){
+          nextMidi = chooseMidiByPhraseRules(
+            n.step,
+            prevBefore,
+            centerMidi,
+            scalePCs,
+            leapState,
+            repeatTargetMidi,
+            isLast,
+            weights,
+            rangeMinMidi,
+            rangeMaxMidi
+          );
+        }
+      }
+      if (!motifMap.has(motifKey)) motifMap.set(motifKey, nextMidi);
+      if (nextMidi !== n.midi) n.midi = nextMidi;
+      if (Number.isFinite(prevBefore)){
+        const iv = nextMidi - prevBefore;
+        const absIv = Math.abs(iv);
+        if (absIv >= 7){
+          leapState.dir = Math.sign(iv) || leapState.dir;
+          leapState.size = absIv;
+        }else{
+          leapState.size = Math.max(0, leapState.size - 2);
+          if (leapState.size < 4) leapState.dir = 0;
+        }
+      }
+      prevMidi = nextMidi;
     }
+    lockLastNoteToStableTone(selected, scalePCs, centerMidi, rangeMinMidi, rangeMaxMidi);
+    const changed = selected.reduce((sum, n)=> sum + (n.midi !== originalMidiMap.get(n) ? 1 : 0), 0);
 
     rebuildAudio();
     renderAll();
-    setStatus(changed > 0 ? `Randomized ${changed} selected notes` : "Selected notes unchanged");
+    setStatus(changed > 0 ? `Randomized ${changed} selected pitches (weighted, span=${pitchSpan}st)` : "Selected pitches unchanged");
   }
 
   function randInt(min, max){
@@ -3619,6 +3695,18 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
 
   function getPhrasePitchSpanSemitones(){
     return clamp(Number(randPitchSpan?.value || 24), 6, 48);
+  }
+
+  function getPhrasePitchMidiRange(centerMidi){
+    const pitchSpan = getPhrasePitchSpanSemitones();
+    const halfSpan = Math.max(1, Math.floor(pitchSpan / 2));
+    let rangeMinMidi = clamp(centerMidi - halfSpan, midiMinLimit, midiMaxLimit);
+    let rangeMaxMidi = clamp(centerMidi + halfSpan, midiMinLimit, midiMaxLimit);
+    if (rangeMaxMidi - rangeMinMidi < 2){
+      rangeMinMidi = Math.max(midiMinLimit, rangeMinMidi - 2);
+      rangeMaxMidi = Math.min(midiMaxLimit, rangeMaxMidi + 2);
+    }
+    return { pitchSpan, rangeMinMidi, rangeMaxMidi };
   }
 
   function getPhraseDurationRandomness(){
@@ -3905,14 +3993,7 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
       .sort((a,b)=> (a.step - b.step) || (a.midi - b.midi));
     if (prev.length) prevMidi = prev[prev.length-1].midi;
     const centerMidi = estimatePhraseCenterMidi(cfg, scalePCs);
-    const pitchSpan = getPhrasePitchSpanSemitones();
-    const halfSpan = Math.max(1, Math.floor(pitchSpan / 2));
-    let rangeMinMidi = clamp(centerMidi - halfSpan, midiMinLimit, midiMaxLimit);
-    let rangeMaxMidi = clamp(centerMidi + halfSpan, midiMinLimit, midiMaxLimit);
-    if (rangeMaxMidi - rangeMinMidi < 2){
-      rangeMinMidi = Math.max(midiMinLimit, rangeMinMidi - 2);
-      rangeMaxMidi = Math.min(midiMaxLimit, rangeMaxMidi + 2);
-    }
+    const { pitchSpan, rangeMinMidi, rangeMaxMidi } = getPhrasePitchMidiRange(centerMidi);
     const motifSpan = Math.max(snap, Math.min(STEPS_PER_BAR, cfg.end - cfg.start));
     const motifMap = new Map();
     const leapState = { dir: 0, size: 0 };
@@ -8218,11 +8299,12 @@ function isTransportPlaying() {
     const sleeping = (!playing) && isSleepingNow();
     const thinking = (!playing) && (!sleeping) && isThinkingNow();
     const dragging = !!drag;
-    const mode = dragging ? 'drag' : (playing ? 'play' : (sleeping ? 'sleep' : (thinking ? 'think' : 'idle')));
+    const dragVisual = dragging && !sleeping;
+    const mode = dragVisual ? 'drag' : (playing ? 'play' : (sleeping ? 'sleep' : (thinking ? 'think' : 'idle')));
     const velBlend = 1 - Math.exp(-dt * 18);
     const settleBlend = 1 - Math.exp(-dt * 12);
 
-    if (dragging) {
+    if (dragVisual) {
       dragAnim.vx += (dragAnim.targetVx - dragAnim.vx) * velBlend;
       dragAnim.vy += (dragAnim.targetVy - dragAnim.vy) * velBlend;
       dragAnim.targetVx *= Math.exp(-dt * 10);
@@ -8235,10 +8317,10 @@ function isTransportPlaying() {
     const moveX = clamp(dragAnim.vx * 10, -1, 1);
     const moveY = clamp(dragAnim.vy * 10, -1, 1);
     const sway = Math.sin(now * 0.018) * 0.035;
-    const targetTilt = dragging ? clamp(moveX * 0.14 + sway, -0.18, 0.18) : 0;
-    const targetStretchX = dragging ? (1 + Math.min(0.08, Math.abs(moveX) * 0.05)) : 1;
-    const targetStretchY = dragging ? (1 - Math.min(0.06, Math.abs(moveX) * 0.03 + Math.abs(moveY) * 0.04)) : 1;
-    const targetLift = dragging ? (2.5 + Math.abs(moveY) * 5 + Math.abs(moveX) * 2) : 0;
+    const targetTilt = dragVisual ? clamp(moveX * 0.14 + sway, -0.18, 0.18) : 0;
+    const targetStretchX = dragVisual ? (1 + Math.min(0.08, Math.abs(moveX) * 0.05)) : 1;
+    const targetStretchY = dragVisual ? (1 - Math.min(0.06, Math.abs(moveX) * 0.03 + Math.abs(moveY) * 0.04)) : 1;
+    const targetLift = dragVisual ? (2.5 + Math.abs(moveY) * 5 + Math.abs(moveX) * 2) : 0;
     dragAnim.tilt += (targetTilt - dragAnim.tilt) * (1 - Math.exp(-dt * 16));
     dragAnim.stretchX += (targetStretchX - dragAnim.stretchX) * (1 - Math.exp(-dt * 14));
     dragAnim.stretchY += (targetStretchY - dragAnim.stretchY) * (1 - Math.exp(-dt * 14));
