@@ -4,7 +4,7 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0f1116">
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
   <title>Piano Roll Composer - Scroll Fix + Follow Fix + Pitch Wheel + Compact Chords</title>
   <script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
   <style>
@@ -24,6 +24,7 @@
       --r:16px;
     }
     *{box-sizing:border-box}
+    html{-webkit-text-size-adjust:100%}
     body{
       margin:0;
       font-family: ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans JP","Hiragino Sans","Yu Gothic",sans-serif;
@@ -76,6 +77,7 @@
       color:var(--text);font-weight:650;letter-spacing:.2px;
       transition:.12s transform ease, .12s filter ease, .12s border-color ease;
       user-select:none;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;
+      touch-action:manipulation;
     }
     .btn:hover{transform:translateY(-1px);filter:brightness(1.05);border-color:#39507a}
     .btn:active{transform:translateY(0px);filter:brightness(.98)}
@@ -151,6 +153,7 @@
       cursor:pointer;
       user-select:none;
       transition:.12s border-color ease, .12s filter ease;
+      touch-action:manipulation;
     }
     .phraseItem:hover{filter:brightness(1.05);}
     .phraseItem.selected{
@@ -379,6 +382,7 @@
       text-align:center;
       user-select:none;
       transition:.12s border-color ease, .12s filter ease, .12s transform ease;
+      touch-action:manipulation;
     }
     .chordPickBtn:hover{filter:brightness(1.06); transform:translateY(-1px);}
     .chordPickBtn.selected{
@@ -760,8 +764,11 @@ body.mobile-ui.mobile-settings-open .transportFixed{
 }
 body.mobile-ui #mobileMainNav{
   display:grid;
-  grid-template-columns:repeat(4, minmax(0,1fr));
+  grid-template-columns:repeat(3, minmax(0,1fr));
   gap:6px;
+}
+body.mobile-ui #btnMobileViewChords{
+  display:none;
 }
 body.mobile-ui .mobileNavBtn{
   min-height:40px;
@@ -851,11 +858,19 @@ body.mobile-ui.mobile-phrase-open .leftDock{
   position:fixed;
   inset:calc(var(--mobile-top-h) + 8px) 8px calc(var(--mobile-bottom-h) + 8px) 8px;
   z-index:11400;
+  padding:4px;
+  border-radius:24px;
+  background:rgba(3,8,18,.72);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
 }
 body.mobile-ui .phraseCard{
   height:100%;
   min-height:0;
   border-radius:20px;
+  background:linear-gradient(180deg, rgba(5,9,18,.98), rgba(4,7,14,.98));
+  border-color:#35517d;
+  box-shadow:0 24px 48px rgba(0,0,0,.55);
 }
 body.mobile-ui .phraseBody{
   gap:12px;
@@ -1060,11 +1075,60 @@ body.mobile-ui.mobile-portrait .pill{
   min-height:40px;
 }
 body.mobile-ui:not(.mobile-portrait) #mobileEditorDock{
-  max-height:112px;
+  max-height:84px;
+  padding:6px;
+  gap:4px;
 }
 body.mobile-ui:not(.mobile-portrait) .phraseToolbar,
 body.mobile-ui:not(.mobile-portrait) .phraseStorageLine{
   grid-template-columns:repeat(3, minmax(0,1fr));
+}
+body.mobile-ui:not(.mobile-portrait) .toolbar{
+  padding:6px;
+  gap:4px;
+}
+body.mobile-ui:not(.mobile-portrait) .transportFixed .btn,
+body.mobile-ui:not(.mobile-portrait) .transportFixed .pill,
+body.mobile-ui:not(.mobile-portrait) .mobileNavBtn,
+body.mobile-ui:not(.mobile-portrait) .btn,
+body.mobile-ui:not(.mobile-portrait) .pill{
+  min-height:34px;
+  font-size:12px;
+  padding:6px 8px;
+}
+body.mobile-ui:not(.mobile-portrait) .mobileToolRow.active{
+  grid-template-columns:repeat(7, minmax(0,1fr));
+  gap:4px;
+}
+body.mobile-ui:not(.mobile-portrait) .mobileToolBtn,
+body.mobile-ui:not(.mobile-portrait) .mobileQuickBtn{
+  min-height:30px;
+  padding:5px 4px;
+  font-size:11px;
+}
+body.mobile-ui:not(.mobile-portrait) .mobileInspectorTitle{
+  font-size:11px;
+  line-height:1.2;
+}
+body.mobile-ui:not(.mobile-portrait) .panelHeader{
+  padding:6px 8px;
+}
+body.mobile-ui:not(.mobile-portrait) .panelHeader .title{
+  font-size:13px;
+}
+body.mobile-ui:not(.mobile-portrait) .canvasWrap{
+  padding:6px;
+  gap:4px;
+}
+body.mobile-ui:not(.mobile-portrait) .subHeader{
+  margin-top:4px;
+  margin-bottom:2px;
+  padding:4px 6px;
+}
+body.mobile-ui:not(.mobile-portrait) .pitchRulerPad,
+body.mobile-ui:not(.mobile-portrait) #pitchSide{
+  width:56px;
+  flex:0 0 56px;
 }
 
 @media (max-width: 1280px){
@@ -1796,6 +1860,7 @@ body.mobile-ui:not(.mobile-portrait) .phraseStorageLine{
   };
   let mobileViewportMetricsRaf = 0;
   let mobileViewportRefitPending = false;
+  let mobileLastTouchEndTs = 0;
 
   function applySidebarCollapsedState(){
     if (!mainLayout || !phraseCard) return;
@@ -1829,15 +1894,29 @@ body.mobile-ui:not(.mobile-portrait) .phraseStorageLine{
     );
   }
 
+  function currentViewportWidth(){
+    const vv = window.visualViewport;
+    return Math.max(
+      1,
+      Math.round(vv && vv.width ? vv.width : (window.innerWidth || document.documentElement.clientWidth || 0))
+    );
+  }
+
+  function isPortraitViewport(){
+    if (window.matchMedia && window.matchMedia("(orientation: portrait)").matches) return true;
+    if (window.matchMedia && window.matchMedia("(orientation: landscape)").matches) return false;
+    return currentViewportHeight() > currentViewportWidth();
+  }
+
   function detectMobileUILayout(){
     const ua = navigator.userAgent || "";
     const hasTouch = (navigator.maxTouchPoints || 0) > 0 || ("ontouchstart" in window);
     const coarse = window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(any-pointer: coarse)").matches;
     const noHover = window.matchMedia("(hover: none)").matches || window.matchMedia("(any-hover: none)").matches;
     const mobileUA = /Android|iPhone|iPad|iPod|Mobile|Windows Phone|webOS/i.test(ua);
-    const shortEdge = Math.min(window.innerWidth || 0, currentViewportHeight());
+    const shortEdge = Math.min(currentViewportWidth(), currentViewportHeight());
     const narrowLayout = shortEdge > 0 && shortEdge <= 980;
-    const touchLandscapePhone = hasTouch && (window.innerWidth || 0) <= 1100 && currentViewportHeight() <= 980;
+    const touchLandscapePhone = hasTouch && currentViewportWidth() <= 1100 && currentViewportHeight() <= 980;
     return !!(mobileUA || (hasTouch && (coarse || noHover) && narrowLayout) || touchLandscapePhone);
   }
 
@@ -2068,7 +2147,7 @@ body.mobile-ui:not(.mobile-portrait) .phraseStorageLine{
   function refreshMobileMode(){
     applyViewportHeightVars();
     mobileUI.active = detectMobileUILayout();
-    mobileUI.portrait = currentViewportHeight() > window.innerWidth;
+    mobileUI.portrait = isPortraitViewport();
     if (!mobileUI.active){
       mobileUI.settingsOpen = false;
       mobileUI.phraseOpen = false;
@@ -2884,18 +2963,18 @@ body.mobile-ui:not(.mobile-portrait) .phraseStorageLine{
     const mobilePortrait = mobileUI.active && mobileUI.portrait;
     const gapBudget = mobileUI.active ? (mobilePortrait ? 22 : 32) : 46;
     if (mobileUI.active && mobileUI.mainView === "chords"){
-      const chordTarget = clamp(Math.round(hostH * (mobilePortrait ? 0.28 : 0.34)), mobilePortrait ? 88 : 120, mobilePortrait ? 180 : 220);
+      const chordTarget = clamp(Math.round(hostH * (mobilePortrait ? 0.28 : 0.26)), mobilePortrait ? 88 : 90, mobilePortrait ? 180 : 160);
       const melodyTarget = hostH - rulerH - headerH - chordTarget - gapBudget - 8;
       ui.chordH = chordTarget;
       ui.melodyH = clamp(melodyTarget, mobilePortrait ? 92 : 108, 520);
       return;
     }
-    const chordRatio = mobileUI.active ? (mobilePortrait ? 0.12 : 0.16) : 0.125;
-    const chordTarget = clamp(Math.round(hostH * chordRatio), mobileUI.active ? (mobilePortrait ? 56 : 78) : 60, mobileUI.active ? (mobilePortrait ? 110 : 140) : 120);
+    const chordRatio = mobileUI.active ? (mobilePortrait ? 0.12 : 0.09) : 0.125;
+    const chordTarget = clamp(Math.round(hostH * chordRatio), mobileUI.active ? (mobilePortrait ? 56 : 42) : 60, mobileUI.active ? (mobilePortrait ? 110 : 78) : 120);
     const melodyTrim = mobileUI.active ? (mobilePortrait ? 2 : 6) : 16;
     const melodyTarget = hostH - rulerH - headerH - chordTarget - gapBudget - melodyTrim;
     ui.chordH = chordTarget;
-    ui.melodyH = clamp(melodyTarget, mobileUI.active ? (mobilePortrait ? 120 : 180) : 150, 1400);
+    ui.melodyH = clamp(melodyTarget, mobileUI.active ? (mobilePortrait ? 120 : 150) : 150, 1400);
   }
 
   function applyRollVerticalScale(){
@@ -6143,10 +6222,16 @@ function hitNote(mx,my){
   }, {passive:false});
 
   chordCanvas.addEventListener("pointerdown", (e)=>{
-    if (!mobileUI.active || !isTouchPointerEvent(e) || mobileUI.mainView !== "chords") return;
+    if (!mobileUI.active || !isTouchPointerEvent(e) || mobileUI.settingsOpen || mobileUI.phraseOpen) return;
     e.preventDefault();
     rememberTouchInteraction();
     markUserScroll();
+    if (mobileUI.mainView !== "chords"){
+      mobileUI.mainView = "chords";
+      updateMobileLayoutState();
+      resizeCanvases();
+      renderAll();
+    }
     const {mx,my} = canvasMousePos(chordCanvas, e);
     const hit = hitChord(mx,my);
     const tool = currentMobileTool();
@@ -6623,6 +6708,25 @@ function hitNote(mx,my){
     window.visualViewport.addEventListener("resize", handleViewportChange);
     window.visualViewport.addEventListener("scroll", handleViewportChange);
   }
+  document.addEventListener("gesturestart", (e)=>{
+    if (!mobileUI.active) return;
+    e.preventDefault();
+  }, {passive:false});
+  document.addEventListener("dblclick", (e)=>{
+    if (!mobileUI.active) return;
+    e.preventDefault();
+  }, {passive:false});
+  document.addEventListener("touchend", (e)=>{
+    if (!mobileUI.active) return;
+    const now = performance.now();
+    const interactiveTarget = e.target && e.target.closest
+      ? e.target.closest("button, input, select, textarea, canvas, .btn, .pill, .phraseItem, .chordPickBtn")
+      : null;
+    if (!interactiveTarget && (now - mobileLastTouchEndTs) < 320){
+      e.preventDefault();
+    }
+    mobileLastTouchEndTs = now;
+  }, {passive:false});
   window.addEventListener("keydown", (e)=>{
     if (e.key === "Escape" && opsPanelOpen){
       setOpsPanelOpen(false);
