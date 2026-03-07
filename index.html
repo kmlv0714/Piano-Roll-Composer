@@ -1147,7 +1147,10 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
       <div class="transportFixed">
         <button id="btnStartAudio" class="btn primary">Audio Unlock</button>
         <button id="btnPlay" class="btn good">Play</button>
+        <button id="btnPlayFromCursor" class="btn">Play From Cursor</button>
         <button id="btnStop" class="btn">Stop</button>
+        <button id="btnJumpStart" class="btn">|&lt; Start</button>
+        <button id="btnJumpEnd" class="btn">End &gt;|</button>
         <button id="btnMobileUndo" class="btn mobileOnly" type="button">Undo</button>
         <button id="btnMobileRedo" class="btn mobileOnly" type="button">Redo</button>
         <label class="pill transportSecondary">Tempo
@@ -1413,6 +1416,7 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
           <button id="btnRedo" class="btn">Redo</button>
           <button id="btnCopy" class="btn">Copy</button>
           <button id="btnPaste" class="btn">Paste</button>
+          <button id="btnClearMelody" class="btn">Clear Melody</button>
           <button id="btnToggleFollow" class="btn">Follow: ON</button>
         </div>
       </div>
@@ -1622,7 +1626,10 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
   const pitchThreshLabel = document.getElementById("pitchThreshLabel");
   const midiInputSelect = document.getElementById("midiInputSelect");
   const btnPlay = document.getElementById("btnPlay");
+  const btnPlayFromCursor = document.getElementById("btnPlayFromCursor");
   const btnStop = document.getElementById("btnStop");
+  const btnJumpStart = document.getElementById("btnJumpStart");
+  const btnJumpEnd = document.getElementById("btnJumpEnd");
   const btnMobileUndo = document.getElementById("btnMobileUndo");
   const btnMobileRedo = document.getElementById("btnMobileRedo");
   const btnStepInput = document.getElementById("btnStepInput");
@@ -1630,6 +1637,7 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
   const btnRedo = document.getElementById("btnRedo");
   const btnCopy = document.getElementById("btnCopy");
   const btnPaste = document.getElementById("btnPaste");
+  const btnClearMelody = document.getElementById("btnClearMelody");
   const btnSave = document.getElementById("btnSave");
   const fileLoad = document.getElementById("fileLoad");
   const btnPhraseStock = document.getElementById("btnPhraseStock");
@@ -6468,6 +6476,7 @@ function hitNote(mx,my){
   btnRedo.addEventListener("click", redo);
   btnCopy.addEventListener("click", copySelection);
   btnPaste.addEventListener("click", pasteClipboard);
+  if (btnClearMelody) btnClearMelody.addEventListener("click", clearAllMelodyNotes);
 
   // ======== UI TOGGLES ========
   btnToggleDrums.addEventListener("click", ()=>{
@@ -6890,6 +6899,59 @@ function hitNote(mx,my){
     setStatus("Audio unlocked");
   });
 
+  function startUiPlaybackAt(startStep, statusText){
+    if (rafId){
+      try{ PRC_DEBUG.warn("startUiPlaybackAt: cancel stale ui RAF before start", { rafId, startStep }); }catch(e){}
+      cancelAnimationFrame(rafId);
+      try{ PRC_DEBUG.bump("uiRafCancelCount"); }catch(e){}
+    }
+    rafId = null;
+    startStablePlayback(startStep);
+    isPlaying = true;
+    playStepFloat = clamp(__normStepIndex(startStep), 0, TOTAL_STEPS - 1);
+    posMelody.classList.add("playing");
+    posChords.classList.add("playing");
+    rafId = requestAnimationFrame(tickUI);
+    try{ PRC_DEBUG.bump("uiRafRequestCount"); }catch(e){}
+    setStatus(statusText);
+  }
+
+  function jumpCursorToStart(){
+    setStepCursor(0, true);
+    if (!isPlaying){
+      playStepFloat = 0;
+      renderAll();
+    }
+    setStatus("Cursor moved to start");
+  }
+
+  function jumpCursorToEnd(){
+    const lastStep = Math.max(0, TOTAL_STEPS - 1);
+    setStepCursor(lastStep, true);
+    if (!isPlaying){
+      playStepFloat = lastStep;
+      renderAll();
+    }
+    setStatus("Cursor moved to end");
+  }
+
+  function clearAllMelodyNotes(){
+    if (!notes.length){
+      setStatus("Melody is already empty");
+      return;
+    }
+    pushUndo("Clear melody");
+    notes = [];
+    mel.sel.set.clear();
+    mel.sel.active = false;
+    mel.drag.mode = null;
+    mel.drag.ghost = null;
+    stepHeld.clear();
+    rebuildAudio();
+    renderAll();
+    setStatus("Melody cleared");
+  }
+
   // ======== WEB MIDI ========
   async function enableMidi(){
     if (!navigator.requestMIDIAccess){
@@ -7285,19 +7347,13 @@ function hitNote(mx,my){
     if (isPlaying) return;
     __autoPausedByHidden = false;
     await Tone.start();
-    if (rafId){
-      try{ PRC_DEBUG.warn("btnPlay: cancel stale ui RAF before start", { rafId }); }catch(e){}
-      cancelAnimationFrame(rafId);
-      try{ PRC_DEBUG.bump("uiRafCancelCount"); }catch(e){}
-    }
-    rafId = null;
-    startStablePlayback();
-    isPlaying = true;
-    posMelody.classList.add("playing");
-    posChords.classList.add("playing");
-    rafId = requestAnimationFrame(tickUI);
-    try{ PRC_DEBUG.bump("uiRafRequestCount"); }catch(e){}
-    setStatus("Playing");
+    startUiPlaybackAt(0, "Playing");
+  });
+
+  if (btnPlayFromCursor) btnPlayFromCursor.addEventListener("click", async ()=>{
+    __autoPausedByHidden = false;
+    await Tone.start();
+    startUiPlaybackAt(stepCursor, `Playing from cursor ${Math.floor(stepCursor/16)+1}:${Math.floor((stepCursor%16)/4)+1}:${(stepCursor%4)+1}`);
   });
 
   btnStop.addEventListener("click", ()=>{
@@ -7316,6 +7372,9 @@ function hitNote(mx,my){
     renderAll();
     setStatus("Stopped");
   });
+
+  if (btnJumpStart) btnJumpStart.addEventListener("click", jumpCursorToStart);
+  if (btnJumpEnd) btnJumpEnd.addEventListener("click", jumpCursorToEnd);
 
   document.addEventListener("visibilitychange", ()=>{
     if (!__AUTO_PAUSE_WHEN_HIDDEN) return;
