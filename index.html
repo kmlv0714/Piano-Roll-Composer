@@ -1416,6 +1416,8 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
           <button id="btnRedo" class="btn">Redo</button>
           <button id="btnCopy" class="btn">Copy</button>
           <button id="btnPaste" class="btn">Paste</button>
+          <button id="btnMidiCopy" class="btn">MIDI Copy</button>
+          <button id="btnMidiExport" class="btn">MIDI Export</button>
           <button id="btnClearMelody" class="btn">Clear Melody</button>
           <button id="btnToggleFollow" class="btn">Follow: ON</button>
         </div>
@@ -1637,6 +1639,8 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
   const btnRedo = document.getElementById("btnRedo");
   const btnCopy = document.getElementById("btnCopy");
   const btnPaste = document.getElementById("btnPaste");
+  const btnMidiCopy = document.getElementById("btnMidiCopy");
+  const btnMidiExport = document.getElementById("btnMidiExport");
   const btnClearMelody = document.getElementById("btnClearMelody");
   const btnSave = document.getElementById("btnSave");
   const fileLoad = document.getElementById("fileLoad");
@@ -2597,7 +2601,7 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
   let __stepCursor = 0;
   const __SCHEDULE_MIN_AHEAD_SEC = 0.02;
   const __DROP_LATE_MS = 80;
-  const __AUTO_PAUSE_WHEN_HIDDEN = true;
+  const __AUTO_PAUSE_WHEN_HIDDEN = false;
   const __DRUM_REBUILD_HIT_THRESHOLD = 1536;
   let __autoPausedByHidden = false;
   let __resumeStepOnVisible = 0;
@@ -4973,6 +4977,184 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
     rebuildAudio(); renderAll(); setStatus("Pasted");
   }
 
+  function getMelodyNotesForMidiCopy(){
+    const selectedNotes = (mel && mel.sel && mel.sel.set) ? Array.from(mel.sel.set) : [];
+    const source = selectedNotes.length
+      ? selectedNotes
+      : notes.slice();
+    if (!source.length) return null;
+    const baseStep = selectedNotes.length
+      ? Math.min(...selectedNotes.map(n => n.step))
+      : 0;
+    return {
+      scope: selectedNotes.length ? "selection" : "song",
+      baseStep,
+      notes: source
+        .map(n => ({
+          step: Math.max(0, Number(n.step) - baseStep),
+          dur: Math.max(0.25, Number(n.dur) || 0),
+          midi: clamp(Math.round(Number(n.midi) || 60), 0, 127),
+          vel: n.vel
+        }))
+        .sort((a,b)=> (a.step - b.step) || (a.midi - b.midi) || (a.dur - b.dur))
+    };
+  }
+
+  function midiVelocityByte(vel){
+    const v = Number(vel);
+    if (!Number.isFinite(v)) return 100;
+    if (v <= 1.001) return clamp(Math.round(v * 127), 1, 127);
+    return clamp(Math.round(v), 1, 127);
+  }
+
+  function encodeMidiVarLen(v){
+    let value = Math.max(0, Math.floor(v));
+    const out = [value & 0x7F];
+    value >>= 7;
+    while (value > 0){
+      out.unshift((value & 0x7F) | 0x80);
+      value >>= 7;
+    }
+    return out;
+  }
+
+  function uint32Bytes(n){
+    return [
+      (n >>> 24) & 0xFF,
+      (n >>> 16) & 0xFF,
+      (n >>> 8) & 0xFF,
+      n & 0xFF
+    ];
+  }
+
+  function buildMidiFileBytesForNotes(noteList){
+    const ppq = 480;
+    const ticksPerStep = ppq / 4; // 1 step = 1/16 note
+    const tempoBpm = clamp(Math.round(Number(tempo?.value || 120)), 20, 400);
+    const tempoUsec = Math.max(1, Math.round(60000000 / tempoBpm));
+    const events = [];
+    for (const n of noteList){
+      const startTick = Math.max(0, Math.round(Number(n.step || 0) * ticksPerStep));
+      const endTick = Math.max(startTick + 1, Math.round((Number(n.step || 0) + Number(n.dur || 0)) * ticksPerStep));
+      const midi = clamp(Math.round(Number(n.midi) || 60), 0, 127);
+      const vel = midiVelocityByte(n.vel);
+      events.push({ tick: startTick, type: "on", midi, vel });
+      events.push({ tick: endTick, type: "off", midi, vel: 0 });
+    }
+    events.sort((a,b)=>{
+      if (a.tick !== b.tick) return a.tick - b.tick;
+      if (a.type !== b.type) return a.type === "off" ? -1 : 1;
+      return a.midi - b.midi;
+    });
+
+    const track = [];
+    track.push(
+      0x00, 0xFF, 0x51, 0x03,
+      (tempoUsec >>> 16) & 0xFF,
+      (tempoUsec >>> 8) & 0xFF,
+      tempoUsec & 0xFF
+    );
+    track.push(0x00, 0xFF, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08);
+
+    let lastTick = 0;
+    for (const ev of events){
+      track.push(...encodeMidiVarLen(ev.tick - lastTick));
+      if (ev.type === "on"){
+        track.push(0x90, ev.midi, ev.vel);
+      }else{
+        track.push(0x80, ev.midi, 0x00);
+      }
+      lastTick = ev.tick;
+    }
+    track.push(0x00, 0xFF, 0x2F, 0x00);
+
+    const header = [
+      0x4D, 0x54, 0x68, 0x64,
+      0x00, 0x00, 0x00, 0x06,
+      0x00, 0x00,
+      0x00, 0x01,
+      (ppq >>> 8) & 0xFF,
+      ppq & 0xFF
+    ];
+    const trackChunk = [
+      0x4D, 0x54, 0x72, 0x6B,
+      ...uint32Bytes(track.length),
+      ...track
+    ];
+    return new Uint8Array([...header, ...trackChunk]);
+  }
+
+  function downloadMidiBlob(blob, filename){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=> URL.revokeObjectURL(url), 1000);
+  }
+
+  function prepareMelodyMidiExport(){
+    const payload = getMelodyNotesForMidiCopy();
+    if (!payload || !payload.notes.length) return null;
+    const bytes = buildMidiFileBytesForNotes(payload.notes);
+    const filename = payload.scope === "selection" ? "prc-selection.mid" : "prc-song.mid";
+    return {
+      payload,
+      bytes,
+      blob: new Blob([bytes], { type: "audio/midi" }),
+      filename
+    };
+  }
+
+  function exportMelodyAsMidiFile(){
+    const midi = prepareMelodyMidiExport();
+    if (!midi){
+      setStatus("No melody notes to export");
+      return;
+    }
+    downloadMidiBlob(midi.blob, midi.filename);
+    setStatus(`MIDI exported (${midi.payload.scope})`);
+  }
+
+  async function copyMelodyAsMidi(){
+    const midi = prepareMelodyMidiExport();
+    if (!midi){
+      setStatus("No melody notes to export");
+      return;
+    }
+
+    if (!navigator.clipboard || typeof navigator.clipboard.write !== "function" || typeof ClipboardItem === "undefined"){
+      setStatus("Clipboard binary MIDI unsupported in this browser. Use MIDI Export");
+      return;
+    }
+
+    try{
+      const itemData = {};
+      const midiTypes = ["audio/midi", "audio/x-midi", "application/x-midi"];
+      let hasMidiType = false;
+      for (const type of midiTypes){
+        if (!ClipboardItem.supports || ClipboardItem.supports(type)){
+          itemData[type] = new Blob([midi.bytes], { type });
+          hasMidiType = true;
+        }
+      }
+      if (!hasMidiType){
+        setStatus("Clipboard does not accept MIDI binary here. Use MIDI Export");
+        return;
+      }
+      itemData["text/plain"] = new Blob(
+        [`${midi.filename}\nStandard MIDI data copied from Browser Piano Roll Composer.`],
+        { type: "text/plain" }
+      );
+      await navigator.clipboard.write([new ClipboardItem(itemData)]);
+      setStatus(`MIDI copied (${midi.payload.scope}). DAW paste support depends on host`);
+    }catch(err){
+      setStatus(`Clipboard MIDI failed: ${err.message}. Use MIDI Export`);
+    }
+  }
+
   // ======== DRAW HELPERS ========
   function roundRect(ctx,x,y,w,h,r){
     r = Math.min(r, w/2, h/2);
@@ -6570,6 +6752,8 @@ function hitNote(mx,my){
   btnRedo.addEventListener("click", redo);
   btnCopy.addEventListener("click", copySelection);
   btnPaste.addEventListener("click", pasteClipboard);
+  if (btnMidiCopy) btnMidiCopy.addEventListener("click", ()=> { copyMelodyAsMidi(); });
+  if (btnMidiExport) btnMidiExport.addEventListener("click", ()=> { exportMelodyAsMidiFile(); });
   if (btnClearMelody) btnClearMelody.addEventListener("click", clearAllMelodyNotes);
 
   // ======== UI TOGGLES ========
@@ -7472,7 +7656,15 @@ function hitNote(mx,my){
   if (btnJumpEnd) btnJumpEnd.addEventListener("click", jumpCursorToEnd);
 
   document.addEventListener("visibilitychange", ()=>{
-    if (!__AUTO_PAUSE_WHEN_HIDDEN) return;
+    if (!__AUTO_PAUSE_WHEN_HIDDEN){
+      if (!document.hidden){
+        if (isPlaying){
+          playStepFloat = clamp(stepFloatFromTransport(), 0, TOTAL_STEPS - 1);
+        }
+        renderAll();
+      }
+      return;
+    }
 
     if (document.hidden){
       if (!isPlaying) return;
