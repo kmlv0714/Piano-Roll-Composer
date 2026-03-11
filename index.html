@@ -1311,6 +1311,11 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
 
         <div class="tabPanel" data-tab-panel="random">
           <button id="btnRandomizeSelectedPitch" class="btn">Randomize Sel Pitch</button>
+          <button id="btnLoopPhraseMode" class="btn">Loop Phrase: OFF</button>
+          <label class="pill">Phrase Max
+            <input id="randPhraseStoreMax" type="range" min="1" max="100" value="20" style="width:110px">
+            <span id="randPhraseStoreMaxLabel">20</span>
+          </label>
           <label class="pill">Rhythm
             <select id="randRhythmTemplate">
               <option value="auto" selected>Auto</option>
@@ -1737,7 +1742,10 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
   const btnChordGenReroll = document.getElementById("btnChordGenReroll");
   const chordGenInfo = document.getElementById("chordGenInfo");
   const btnRandomizeSelectedPitch = document.getElementById("btnRandomizeSelectedPitch");
+  const btnLoopPhraseMode = document.getElementById("btnLoopPhraseMode");
   const randPosMode = document.getElementById("randPosMode");
+  const randPhraseStoreMax = document.getElementById("randPhraseStoreMax");
+  const randPhraseStoreMaxLabel = document.getElementById("randPhraseStoreMaxLabel");
   const randBarsSpan = document.getElementById("randBarsSpan");
   const randBarsSpanLabel = document.getElementById("randBarsSpanLabel");
   const randDensity = document.getElementById("randDensity");
@@ -2146,6 +2154,8 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
   let phraseStore = { version: 1, phrases: [] };
   let selectedPhraseId = null;
   let phraseIdSeq = 1;
+  let loopPhraseGenEnabled = false;
+  let __loopPhraseGenPending = false;
   const chordGenState = {
     draft: [],
     lastSpec: null,
@@ -2717,11 +2727,15 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
         tom.triggerAttackRelease((inBar<12)?"C2":"G2","16n",t,0.55); try{ PRC_DEBUG.bump("drumTrigCount"); }catch(e){} __markDrumHit(); t += 0.0001;
       }
     }
+    if (loopPhraseGenEnabled && stepNow === TOTAL_STEPS - 1){
+      enqueueLoopPhraseGeneration();
+    }
   }
 
   function startStablePlayback(startStep=0){
     // Ensure loopEnd consistent
     rebuildAudio();
+    __loopPhraseGenPending = false;
 
     // Clear previous schedules
     if (__repeatId != null){
@@ -2757,6 +2771,7 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
 
   function stopStablePlayback(){
     try{ PRC_DEBUG.bump("transportStopCalls"); }catch(e){}
+    __loopPhraseGenPending = false;
     Tone.Transport.stop();
     Tone.Transport.cancel(0);
     if (__repeatId != null){
@@ -3635,14 +3650,16 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
     return a + Math.floor(Math.random() * (b - a + 1));
   }
 
-  function getRandomizeRangeConfig(){
+  function getRandomizeRangeConfig(options={}){
+    const silent = !!options.silent;
+    const usePlaybackCursor = options.usePlaybackCursor !== false;
     const mode = (randPosMode && randPosMode.value) ? randPosMode.value : "selection";
     const snap = snapSteps();
 
     if (mode === "selection"){
       const selected = (mel && mel.sel && mel.sel.set) ? Array.from(mel.sel.set) : [];
       if (!selected.length){
-        setStatus("Rand Pos=Selection: select notes first");
+        if (!silent) setStatus("Rand Pos=Selection: select notes first");
         return null;
       }
       const minStep = Math.min(...selected.map(n => n.step));
@@ -3653,7 +3670,8 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
     }
 
     if (mode === "cursor"){
-      const base = clamp(quant(isPlaying ? (playStepFloat % TOTAL_STEPS) : stepCursor), 0, TOTAL_STEPS - 1);
+      const cursorBase = (usePlaybackCursor && isPlaying) ? (playStepFloat % TOTAL_STEPS) : stepCursor;
+      const base = clamp(quant(cursorBase), 0, TOTAL_STEPS - 1);
       const barsSpan = clamp(Number(randBarsSpan?.value || 4), 1, TOTAL_BARS);
       const end = clamp(base + (barsSpan * STEPS_PER_BAR), base + snap, TOTAL_STEPS);
       return { mode, start: base, end, selectedNotes: [], seedCount: 0 };
@@ -3968,11 +3986,16 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
     last.midi = best;
   }
 
-  function randomizeNotesStructure(){
-    const cfg = getRandomizeRangeConfig();
+  function generatePhraseStructure(options={}){
+    const cfg = getRandomizeRangeConfig({
+      silent: !!options.silentInvalid,
+      usePlaybackCursor: options.usePlaybackCursor !== false
+    });
     if (!cfg) return;
     const snap = snapSteps();
-    pushUndo("Generate phrase");
+    if (options.pushUndo !== false){
+      pushUndo(options.undoLabel || "Generate phrase");
+    }
 
     if (cfg.mode === "selection" && cfg.selectedNotes.length){
       const del = new Set(cfg.selectedNotes);
@@ -4046,13 +4069,59 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
     lockLastNoteToStableTone(created, scalePCs, centerMidi, rangeMinMidi, rangeMaxMidi);
     for (const n of created) notes.push(n);
     notes.sort((a,b)=> (a.step - b.step) || (a.midi - b.midi));
-    if (mel && mel.sel && mel.sel.set){
+    if (options.setSelection !== false && mel && mel.sel && mel.sel.set){
       mel.sel.set = new Set(created);
     }
 
     rebuildAudio();
-    renderAll();
-    setStatus(`Generated phrase: ${created.length} notes (${templateId}, span=${pitchSpan}st, mode=${cfg.mode})`);
+    if (options.render !== false) renderAll();
+    if (options.status !== false){
+      setStatus(options.statusText || `Generated phrase: ${created.length} notes (${templateId}, span=${pitchSpan}st, mode=${cfg.mode})`);
+    }
+    return { cfg, created, templateId, pitchSpan };
+  }
+
+  function buildLoopPhraseName(){
+    return `Loop ${new Date().toISOString().slice(11, 19)}`;
+  }
+
+  function runLoopPhraseGeneration(){
+    const result = generatePhraseStructure({
+      pushUndo: false,
+      silentInvalid: true,
+      usePlaybackCursor: false
+    });
+    if (!result) return false;
+
+    const stored = addPhraseToStore(result.created, {
+      name: buildLoopPhraseName(),
+      select: false
+    });
+    if (!stored) return false;
+
+    const stockMax = getPhraseStoreMaxCount();
+    const trimmedText = stored.removed > 0 ? `, trimmed ${stored.removed}` : "";
+    setStatus(`Loop phrase generated: ${stored.phrase.notes.length} notes, stock ${phraseStore.phrases.length}/${stockMax}${trimmedText}`);
+    return true;
+  }
+
+  function enqueueLoopPhraseGeneration(){
+    if (!loopPhraseGenEnabled || __loopPhraseGenPending) return;
+    __loopPhraseGenPending = true;
+    const run = ()=>{
+      __loopPhraseGenPending = false;
+      if (!loopPhraseGenEnabled) return;
+      runLoopPhraseGeneration();
+    };
+    if (typeof queueMicrotask === "function"){
+      queueMicrotask(run);
+    }else{
+      Promise.resolve().then(run);
+    }
+  }
+
+  function randomizeNotesStructure(){
+    generatePhraseStructure();
   }
 
   const CHORD_GEN_DEGREES = {
@@ -4610,6 +4679,69 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
     return `phr_${Date.now().toString(36)}_${(phraseIdSeq++).toString(36)}`;
   }
 
+  function getPhraseStoreMaxCount(){
+    return clamp(Number(randPhraseStoreMax?.value || 20), 1, 100);
+  }
+
+  function syncLoopPhraseUi(){
+    if (btnLoopPhraseMode) btnLoopPhraseMode.textContent = `Loop Phrase: ${loopPhraseGenEnabled ? "ON" : "OFF"}`;
+    if (randPhraseStoreMax){
+      const v = String(getPhraseStoreMaxCount());
+      randPhraseStoreMax.value = v;
+      if (randPhraseStoreMaxLabel) randPhraseStoreMaxLabel.textContent = v;
+    }
+  }
+
+  function enforcePhraseStoreLimit(preferredSelectionId = selectedPhraseId){
+    const maxCount = getPhraseStoreMaxCount();
+    let removed = 0;
+    const removedIds = new Set();
+    while (phraseStore.phrases.length > maxCount){
+      const old = phraseStore.phrases.shift();
+      if (!old) break;
+      removedIds.add(old.id);
+      removed++;
+    }
+    if (!phraseStore.phrases.length){
+      selectedPhraseId = null;
+      return removed;
+    }
+    const selectedStillExists = !!(selectedPhraseId && phraseStore.phrases.some(p => p.id === selectedPhraseId));
+    if (!selectedStillExists){
+      const preferredExists = !!(preferredSelectionId && phraseStore.phrases.some(p => p.id === preferredSelectionId));
+      selectedPhraseId = preferredExists ? preferredSelectionId : phraseStore.phrases[phraseStore.phrases.length - 1].id;
+    }
+    return removed;
+  }
+
+  function addPhraseToStore(rawNotes, options={}){
+    const notesOnly = normalizePhraseNotes(rawNotes);
+    if (!notesOnly.length) return null;
+
+    const phrase = {
+      id: nextPhraseId(),
+      name: String(options.name || `Phrase ${phraseStore.phrases.length + 1}`).trim() || `Phrase ${phraseStore.phrases.length + 1}`,
+      notes: notesOnly,
+      lengthSteps: Math.max(1, phraseLengthFromNotes(notesOnly)),
+      createdAt: new Date().toISOString()
+    };
+    phraseStore.phrases.push(phrase);
+
+    if (options.select !== false){
+      selectedPhraseId = phrase.id;
+    }
+    const removed = enforcePhraseStoreLimit(options.select === false ? selectedPhraseId : phrase.id);
+    renderPhraseList();
+
+    if (options.statusMessage){
+      setStatus(options.statusMessage(phrase, removed));
+    }
+    if (options.infoMessage){
+      setPhraseInfo(options.infoMessage(phrase, removed));
+    }
+    return { phrase, removed };
+  }
+
   function phraseLengthFromNotes(noteList){
     let end = 0;
     for (const n of noteList){
@@ -4771,19 +4903,13 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
       updatePhraseControls();
       return;
     }
-
-    const lengthSteps = Math.max(1, phraseLengthFromNotes(notesOnly));
-    const phrase = {
-      id: nextPhraseId(),
-      name: `Phrase ${phraseStore.phrases.length + 1}`,
-      notes: notesOnly,
-      lengthSteps,
-      createdAt: new Date().toISOString()
-    };
-    phraseStore.phrases.push(phrase);
-    selectPhrase(phrase.id);
-    setStatus(`Phrase stocked: ${phrase.name}`);
-    setPhraseInfo(`Stocked "${phrase.name}" (${notesOnly.length} notes).`);
+    addPhraseToStore(notesOnly, {
+      select: true,
+      statusMessage: (phrase, removed)=> removed > 0
+        ? `Phrase stocked: ${phrase.name} (trimmed ${removed} old)`
+        : `Phrase stocked: ${phrase.name}`,
+      infoMessage: (phrase)=> `Stocked "${phrase.name}" (${notesOnly.length} notes).`
+    });
   }
 
   function copySelectedPhraseToClipboard(){
@@ -4867,9 +4993,11 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
 
     phraseStore = { version: 1, phrases: loaded };
     selectedPhraseId = loaded.length ? loaded[0].id : null;
+    const removed = enforcePhraseStoreLimit(selectedPhraseId);
     renderPhraseList();
-    setStatus(`Phrase stocker loaded (${loaded.length} phrases)`);
-    setPhraseInfo(`Loaded ${loaded.length} phrases.`);
+    const kept = phraseStore.phrases.length;
+    setStatus(removed > 0 ? `Phrase stocker loaded (${kept} kept / ${removed} trimmed)` : `Phrase stocker loaded (${kept} phrases)`);
+    setPhraseInfo(removed > 0 ? `Loaded ${kept} phrases. Trimmed ${removed} old phrases to fit the limit.` : `Loaded ${kept} phrases.`);
   }
 
   function savePhraseStoreToFile(){
@@ -6796,6 +6924,13 @@ function hitNote(mx,my){
   btnRetune.addEventListener("click", retuneAllNotesToScale);
   btnRandomizeSelectedPitch.addEventListener("click", randomizeSelectedNotesPitch);
   btnRandomizeStructure.addEventListener("click", randomizeNotesStructure);
+  if (btnLoopPhraseMode){
+    btnLoopPhraseMode.addEventListener("click", ()=>{
+      loopPhraseGenEnabled = !loopPhraseGenEnabled;
+      syncLoopPhraseUi();
+      setStatus(loopPhraseGenEnabled ? "Loop phrase generation ON" : "Loop phrase generation OFF");
+    });
+  }
 
   for (const btn of tabButtons){
     btn.addEventListener("click", ()=>{
@@ -6974,6 +7109,16 @@ function hitNote(mx,my){
   randBarsSpan.addEventListener("input", ()=>{
     randBarsSpanLabel.textContent = randBarsSpan.value;
   });
+  if (randPhraseStoreMax){
+    randPhraseStoreMax.addEventListener("input", ()=>{
+      randPhraseStoreMaxLabel.textContent = randPhraseStoreMax.value;
+      const removed = enforcePhraseStoreLimit(selectedPhraseId);
+      renderPhraseList();
+      if (removed > 0){
+        setStatus(`Phrase stock trimmed to ${randPhraseStoreMax.value} items`);
+      }
+    });
+  }
   if (chordGenBars){
     chordGenBars.addEventListener("input", syncChordGenBarsUI);
   }
@@ -7893,7 +8038,7 @@ function hitNote(mx,my){
   function exportSong(){
     return {
       format: "piano-roll-song",
-      version: 8,
+      version: 9,
       meta: { title:"My Song", author:"You", created:new Date().toISOString() },
       transport: { bpm: Math.round(Tone.Transport.bpm.value), timeSignature:[4,4], bars:TOTAL_BARS, stepsPerBar:STEPS_PER_BAR },
       scale: { root: scaleRoot.value, type: scaleType.value },
@@ -7917,6 +8062,8 @@ function hitNote(mx,my){
           drumVolumePct: Number(drumVol?.value || 100)
         },
         randomize: {
+          loopPhraseEnabled: loopPhraseGenEnabled,
+          phraseStoreMax: getPhraseStoreMaxCount(),
           posMode: randPosMode.value,
           rhythmTemplate: randRhythmTemplate?.value || "auto",
           barsSpan: Number(randBarsSpan.value || 4),
@@ -8019,6 +8166,10 @@ function hitNote(mx,my){
       }
     }
     if (data.ui?.randomize){
+      if (typeof data.ui.randomize.loopPhraseEnabled === "boolean") loopPhraseGenEnabled = data.ui.randomize.loopPhraseEnabled;
+      if (typeof data.ui.randomize.phraseStoreMax === "number" && randPhraseStoreMax){
+        randPhraseStoreMax.value = String(clamp(data.ui.randomize.phraseStoreMax, 1, 100));
+      }
       if (typeof data.ui.randomize.posMode === "string") randPosMode.value = data.ui.randomize.posMode;
       if (typeof data.ui.randomize.rhythmTemplate === "string") randRhythmTemplate.value = data.ui.randomize.rhythmTemplate;
       if (typeof data.ui.randomize.barsSpan === "number") randBarsSpan.value = String(clamp(data.ui.randomize.barsSpan, 1, 16));
@@ -8054,6 +8205,7 @@ function hitNote(mx,my){
       randWRepeatLabel.textContent = randWRepeat.value;
       randWEndStableLabel.textContent = randWEndStable.value;
     }
+    syncLoopPhraseUi();
     if (data.ui?.chordGen){
       const cg = data.ui.chordGen;
       if (typeof cg.key === "string" && ROOT_PC[cg.key] != null) chordGenKey.value = cg.key;
@@ -8164,6 +8316,7 @@ function hitNote(mx,my){
     zoomLabel.textContent = zoom.value;
     if (rollHeightPctLabel) rollHeightPctLabel.textContent = `${rollHeightPct.value}%`;
     randBarsSpanLabel.textContent = randBarsSpan.value;
+    if (randPhraseStoreMaxLabel) randPhraseStoreMaxLabel.textContent = randPhraseStoreMax?.value || "20";
     randDensityLabel.textContent = randDensity.value;
     randDurVarLabel.textContent = randDurVar.value;
     randPitchSpanLabel.textContent = `${randPitchSpan.value} st`;
@@ -8201,6 +8354,7 @@ function hitNote(mx,my){
     btnToggleChordTones.textContent = `Chord Tones: ${ui.toggles.chordTones ? "ON":"OFF"}`;
     btnToggleFollow.textContent = `Follow: ${ui.follow ? "ON":"OFF"}`;
     btnAutoRetune.textContent = `AutoRetune: ${ui.autoRetune ? "ON":"OFF"}`;
+    syncLoopPhraseUi();
     btnStepInput.textContent = "Step Input: OFF";
     chordGenState.draft = [];
     syncChordGenBarsUI();
