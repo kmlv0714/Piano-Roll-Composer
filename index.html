@@ -531,6 +531,18 @@ body{
   min-width:76px;
   justify-content:center;
 }
+.mainLayout.sidebar-collapsed .phraseCard .panelHeader{
+  justify-content:center;
+  padding:8px 6px;
+}
+.mainLayout.sidebar-collapsed .phraseCard .panelHeader .title{
+  display:none;
+}
+.mainLayout.sidebar-collapsed .phraseCard .sidebarToggle{
+  min-width:0;
+  width:100%;
+  padding:8px 6px;
+}
 .panel{
   min-height:0;
   display:flex;
@@ -2609,14 +2621,19 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
 
   let __repeatId = null;
   let __stepCursor = 0;
+  const __TRANSPORT_START_AHEAD_SEC = 0.02;
   const __SCHEDULE_MIN_AHEAD_SEC = 0.02;
   const __DROP_LATE_MS = 80;
-  const __AUTO_PAUSE_WHEN_HIDDEN = false;
+  const __AUTO_PAUSE_WHEN_HIDDEN = true;
+  const __SCHEDULER_MODE_STEP = "step";
+  const __SCHEDULER_MODE_HIDDEN = "hidden";
   const __DRUM_REBUILD_HIT_THRESHOLD = 1536;
   let __autoPausedByHidden = false;
   let __resumeStepOnVisible = 0;
   let __drumHitsSinceRebuild = 0;
   let __drumRebuildPending = false;
+  let __schedulerMode = __SCHEDULER_MODE_STEP;
+  let __visibilityResumePending = false;
 
   function __normStepIndex(s){
     return ((Math.floor(s) % TOTAL_STEPS) + TOTAL_STEPS) % TOTAL_STEPS;
@@ -2658,6 +2675,219 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
       }
     }catch(e){}
     return Tone.now();
+  }
+
+  async function __resumeAudioContextIfNeeded(){
+    try{
+      if (Tone && typeof Tone.start === "function"){
+        await Tone.start();
+      }
+    }catch(e){}
+    try{
+      const tc = Tone && Tone.getContext ? Tone.getContext() : null;
+      const raw = tc ? (tc.rawContext || tc._context || tc.context || tc) : null;
+      if (raw && raw.state === "suspended" && typeof raw.resume === "function"){
+        await raw.resume();
+      }
+    }catch(e){}
+  }
+
+  async function __handleVisiblePlaybackResume(){
+    if (__visibilityResumePending) return;
+    __visibilityResumePending = true;
+    try{
+      await __resumeAudioContextIfNeeded();
+      if (!isPlaying){
+        renderAll();
+        return;
+      }
+
+      let resumeStepFloat = Number(__resumeStepOnVisible) || 0;
+      try{
+        const transportStep = stepFloatFromTransport();
+        if (Number.isFinite(transportStep)) resumeStepFloat = transportStep;
+      }catch(e){}
+      const resumeStep = __normStepIndex(resumeStepFloat);
+      playStepFloat = clamp(resumeStepFloat, 0, TOTAL_STEPS - 1);
+
+      let didRestart = false;
+      if (__schedulerMode === __SCHEDULER_MODE_HIDDEN || Tone.Transport.state !== "started"){
+        startStablePlayback(resumeStep, __SCHEDULER_MODE_STEP);
+        didRestart = true;
+      }
+      if (didRestart){
+        __triggerResumeSustainAt(resumeStepFloat);
+      }
+
+      posMelody.classList.add("playing");
+      posChords.classList.add("playing");
+      if (rafId){
+        cancelAnimationFrame(rafId);
+        try{ PRC_DEBUG.bump("uiRafCancelCount"); }catch(e){}
+      }
+      rafId = requestAnimationFrame(tickUI);
+      try{ PRC_DEBUG.bump("uiRafRequestCount"); }catch(e){}
+      renderAll();
+      try{
+        PRC_DEBUG.log("backgroundScheduler(disabled)", { step: resumeStep, transportState: Tone.Transport.state });
+      }catch(e){}
+    }finally{
+      __visibilityResumePending = false;
+    }
+  }
+
+  function __triggerResumeSustainAt(stepFloat){
+    const currentStep = ((Number(stepFloat) % TOTAL_STEPS) + TOTAL_STEPS) % TOTAL_STEPS;
+    const eventTime = __audioNowImmediate() + __SCHEDULE_MIN_AHEAD_SEC;
+
+    for (let i=0;i<notes.length;i++){
+      const n = notes[i];
+      const endStep = n.step + Math.max(1, Number(n.dur) || 1);
+      if (!(n.step < currentStep && endStep > currentStep)) continue;
+      const remainingSteps = Math.max(0.125, endStep - currentStep);
+      const durSec = Math.max(0.02, Tone.Time(stepToTime(remainingSteps)).toSeconds() - 0.01);
+      try { markSoundActivity(); } catch(e) {}
+      polyLead.triggerAttackRelease(Tone.Frequency(n.midi,"midi").toFrequency(), durSec, eventTime, n.vel ?? 0.9);
+      try{ PRC_DEBUG.bump("noteTrigCount"); }catch(e){}
+    }
+
+    if (!ui.toggles.chords) return;
+    for (let i=0;i<chords.length;i++){
+      const c = chords[i];
+      const endStep = c.start + Math.max(1, Number(c.dur) || 1);
+      if (!(c.start < currentStep && endStep > currentStep)) continue;
+      const remainingSteps = Math.max(0.125, endStep - currentStep);
+      const baseMidi = clamp(midiMinLimit + 28, midiMinLimit, midiMaxLimit);
+      const mids = chordToMidiTriad(c.chord, baseMidi);
+      const freqs = mids.map(m=>Tone.Frequency(m,"midi").toFrequency());
+      const durSec = Math.max(0.03, Tone.Time(stepToTime(remainingSteps)).toSeconds() - 0.01);
+      try { markSoundActivity(); } catch(e) {}
+      polyChord.triggerAttackRelease(freqs, durSec, eventTime, 0.6);
+      try{ PRC_DEBUG.bump("chordTrigCount"); }catch(e){}
+    }
+  }
+
+  function __loopDurationTime(){
+    return `${TOTAL_BARS}:0:0`;
+  }
+
+  function __stepDeltaToSeconds(stepDelta){
+    const safeStepDelta = Math.max(0, Number(stepDelta) || 0);
+    if (safeStepDelta <= 0) return 0;
+    return Tone.Time(stepToTime(safeStepDelta)).toSeconds();
+  }
+
+  function __clearTransportRepeat(){
+    if (__repeatId == null) return;
+    Tone.Transport.clear(__repeatId);
+    try{
+      PRC_DEBUG.bump("transportRepeatCleared");
+      PRC_DEBUG.log("clearRepeat", { repeatId: __repeatId, mode: __schedulerMode });
+    }catch(e){}
+    __repeatId = null;
+  }
+
+  function __flushHiddenSchedulerAudio(){
+    try{ rebuildPolySynths(); }catch(e){}
+    try{ buildDrumSynths(); }catch(e){}
+    __drumHitsSinceRebuild = 0;
+    __drumRebuildPending = false;
+  }
+
+  function __scheduleDrumStepAt(stepNow, time){
+    if (!ui.toggles.drums) return time;
+    const inBar = stepNow % STEPS_PER_BAR;
+    let t = time;
+    try { markSoundActivity(); } catch(e) {}
+    hat.triggerAttackRelease("16n", t, (inBar%2===0)?0.35:0.25); try{ PRC_DEBUG.bump("drumTrigCount"); }catch(e){} __markDrumHit(); t += 0.0001;
+    if (inBar===0 || inBar===6 || inBar===8 || inBar===14) { kick.triggerAttackRelease("C1","16n",t,0.9); try{ PRC_DEBUG.bump("drumTrigCount"); }catch(e){} __markDrumHit(); t += 0.0001; }
+    if (inBar===4 || inBar===12) { snare.triggerAttackRelease("16n",t,0.6); try{ PRC_DEBUG.bump("drumTrigCount"); }catch(e){} __markDrumHit(); t += 0.0001; }
+    if (stepNow===0) { crash.triggerAttackRelease("8n",t,0.55); try{ PRC_DEBUG.bump("drumTrigCount"); }catch(e){} __markDrumHit(); t += 0.0001; }
+    const lastBarStart = (TOTAL_BARS-1) * STEPS_PER_BAR;
+    if (stepNow>=lastBarStart && inBar>=8 && inBar%2===0){
+      tom.triggerAttackRelease((inBar<12)?"C2":"G2","16n",t,0.55); try{ PRC_DEBUG.bump("drumTrigCount"); }catch(e){} __markDrumHit(); t += 0.0001;
+    }
+    return t;
+  }
+
+  function __scheduleLoopSliceAt(startTime, startStep=0, endStep=TOTAL_STEPS){
+    const start = clamp(Math.floor(startStep), 0, TOTAL_STEPS-1);
+    const end = clamp(Math.floor(endStep), start + 1, TOTAL_STEPS);
+    const nowImmediate = __audioNowImmediate();
+    const baseTime = Math.max(startTime, nowImmediate + __SCHEDULE_MIN_AHEAD_SEC);
+
+    for (let i=0;i<notes.length;i++){
+      const n = notes[i];
+      if (n.step < start || n.step >= end) continue;
+      const eventTime = baseTime + __stepDeltaToSeconds(n.step - start);
+      const durSteps = Math.max(1, n.dur|0);
+      const durSec = Math.max(0.02, Tone.Time(stepToTime(durSteps)).toSeconds() - 0.01);
+      try { markSoundActivity(); } catch(e) {}
+      polyLead.triggerAttackRelease(Tone.Frequency(n.midi,"midi").toFrequency(), durSec, eventTime, n.vel ?? 0.9);
+      try{ PRC_DEBUG.bump("noteTrigCount"); }catch(e){}
+    }
+
+    if (ui.toggles.chords){
+      for (let i=0;i<chords.length;i++){
+        const c = chords[i];
+        if (c.start < start || c.start >= end) continue;
+        const eventTime = baseTime + __stepDeltaToSeconds(c.start - start);
+        const baseMidi = clamp(midiMinLimit + 28, midiMinLimit, midiMaxLimit);
+        const mids = chordToMidiTriad(c.chord, baseMidi);
+        const freqs = mids.map(m=>Tone.Frequency(m,"midi").toFrequency());
+        const durSec = Math.max(0.03, Tone.Time(stepToTime(Math.max(1,c.dur|0))).toSeconds() - 0.01);
+        try { markSoundActivity(); } catch(e) {}
+        polyChord.triggerAttackRelease(freqs, durSec, eventTime, 0.6);
+        try{ PRC_DEBUG.bump("chordTrigCount"); }catch(e){}
+      }
+    }
+
+    if (ui.toggles.drums){
+      for (let stepNow = start; stepNow < end; stepNow++){
+        const eventTime = baseTime + __stepDeltaToSeconds(stepNow - start);
+        __scheduleDrumStepAt(stepNow, eventTime);
+      }
+    }
+  }
+
+  function __hiddenLoopAdvance(time){
+    __scheduleLoopSliceAt(time + __stepDeltaToSeconds(TOTAL_STEPS - __stepCursor), 0, TOTAL_STEPS);
+  }
+
+  function __startHiddenPlayback(startStep=0){
+    rebuildAudio();
+    __loopPhraseGenPending = false;
+
+    __clearTransportRepeat();
+    Tone.Transport.stop();
+    Tone.Transport.cancel(0);
+    __flushHiddenSchedulerAudio();
+
+    __stepCursor = clamp(__normStepIndex(startStep), 0, TOTAL_STEPS-1);
+    try{
+      Tone.Transport.position = stepToTime(__stepCursor);
+    }catch(e){
+      __stepCursor = 0;
+      Tone.Transport.position = "0:0:0";
+    }
+
+    const playbackStartTime = __audioNowImmediate() + __TRANSPORT_START_AHEAD_SEC;
+    __scheduleLoopSliceAt(playbackStartTime, __stepCursor, TOTAL_STEPS);
+
+    const repeatStartTime = stepToTime(__stepCursor);
+    __repeatId = Tone.Transport.scheduleRepeat(__hiddenLoopAdvance, repeatStartTime, repeatStartTime);
+    __schedulerMode = __SCHEDULER_MODE_HIDDEN;
+    try{
+      PRC_DEBUG.bump("transportRepeatScheduled");
+      PRC_DEBUG.log("scheduleRepeat(hidden)", {
+        repeatId: __repeatId,
+        bars: TOTAL_BARS,
+        steps: TOTAL_STEPS,
+        startStep: __stepCursor,
+        repeatStartTime
+      });
+    }catch(e){}
+    Tone.Transport.start(`+${__TRANSPORT_START_AHEAD_SEC}`);
   }
 
   function __triggerStep(time){
@@ -2714,36 +2944,30 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
       }
     }
 
-    // Drums pattern (same as original)
-    if (ui.toggles.drums){
-      const inBar = stepNow % STEPS_PER_BAR;
-      try { markSoundActivity(); } catch(e) {}
-      hat.triggerAttackRelease("16n", t, (inBar%2===0)?0.35:0.25); try{ PRC_DEBUG.bump("drumTrigCount"); }catch(e){} __markDrumHit(); t += 0.0001;
-      if (inBar===0 || inBar===6 || inBar===8 || inBar===14) { kick.triggerAttackRelease("C1","16n",t,0.9); try{ PRC_DEBUG.bump("drumTrigCount"); }catch(e){} __markDrumHit(); t += 0.0001; }
-      if (inBar===4 || inBar===12) { snare.triggerAttackRelease("16n",t,0.6); try{ PRC_DEBUG.bump("drumTrigCount"); }catch(e){} __markDrumHit(); t += 0.0001; }
-      if (stepNow===0) { crash.triggerAttackRelease("8n",t,0.55); try{ PRC_DEBUG.bump("drumTrigCount"); }catch(e){} __markDrumHit(); t += 0.0001; }
-      const lastBarStart = (TOTAL_BARS-1) * STEPS_PER_BAR;
-      if (stepNow>=lastBarStart && inBar>=8 && inBar%2===0){
-        tom.triggerAttackRelease((inBar<12)?"C2":"G2","16n",t,0.55); try{ PRC_DEBUG.bump("drumTrigCount"); }catch(e){} __markDrumHit(); t += 0.0001;
-      }
-    }
+    t = __scheduleDrumStepAt(stepNow, t);
     if (loopPhraseGenEnabled && stepNow === TOTAL_STEPS - 1){
       enqueueLoopPhraseGeneration();
     }
   }
 
-  function startStablePlayback(startStep=0){
+  function startStablePlayback(startStep=0, forcedMode=null){
+    const mode = forcedMode || ((document.hidden && !__AUTO_PAUSE_WHEN_HIDDEN) ? __SCHEDULER_MODE_HIDDEN : __SCHEDULER_MODE_STEP);
+    if (mode === __SCHEDULER_MODE_HIDDEN){
+      __startHiddenPlayback(startStep);
+      return;
+    }
+
     // Ensure loopEnd consistent
     rebuildAudio();
     __loopPhraseGenPending = false;
 
     // Clear previous schedules
-    if (__repeatId != null){
-      Tone.Transport.clear(__repeatId);
-      __repeatId = null;
-    }
+    __clearTransportRepeat();
     Tone.Transport.stop();
     Tone.Transport.cancel(0);
+    if (__schedulerMode === __SCHEDULER_MODE_HIDDEN){
+      __flushHiddenSchedulerAudio();
+    }
 
     __stepCursor = clamp(__normStepIndex(startStep), 0, TOTAL_STEPS-1);
     try{
@@ -2756,6 +2980,7 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
     // Resume position is controlled by Transport.position, not by shifting repeat phase.
     const repeatStartTime = "0:0:0";
     __repeatId = Tone.Transport.scheduleRepeat(__triggerStep, "16n", repeatStartTime);
+    __schedulerMode = __SCHEDULER_MODE_STEP;
     try{
       PRC_DEBUG.bump("transportRepeatScheduled");
       PRC_DEBUG.log("scheduleRepeat", {
@@ -2766,7 +2991,7 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
         repeatStartTime
       });
     }catch(e){}
-    Tone.Transport.start("+0.02");
+    Tone.Transport.start(`+${__TRANSPORT_START_AHEAD_SEC}`);
   }
 
   function stopStablePlayback(){
@@ -2774,14 +2999,11 @@ body.mobile-ui:not(.mobile-portrait) #pitchSide{
     __loopPhraseGenPending = false;
     Tone.Transport.stop();
     Tone.Transport.cancel(0);
-    if (__repeatId != null){
-      Tone.Transport.clear(__repeatId);
-      try{
-        PRC_DEBUG.bump("transportRepeatCleared");
-        PRC_DEBUG.log("clearRepeat", { repeatId: __repeatId });
-      }catch(e){}
-      __repeatId = null;
+    __clearTransportRepeat();
+    if (__schedulerMode === __SCHEDULER_MODE_HIDDEN){
+      __flushHiddenSchedulerAudio();
     }
+    __schedulerMode = __SCHEDULER_MODE_STEP;
   }
 
   let kick = null;
@@ -7802,18 +8024,28 @@ function hitNote(mx,my){
 
   document.addEventListener("visibilitychange", ()=>{
     if (!__AUTO_PAUSE_WHEN_HIDDEN){
-      if (!document.hidden){
-        if (isPlaying){
-          playStepFloat = clamp(stepFloatFromTransport(), 0, TOTAL_STEPS - 1);
+      if (document.hidden){
+        if (isPlaying && __schedulerMode !== __SCHEDULER_MODE_HIDDEN){
+          const hiddenStepFloat = stepFloatFromTransport();
+          __resumeStepOnVisible = hiddenStepFloat;
+          playStepFloat = hiddenStepFloat;
+          startStablePlayback(hiddenStepFloat, __SCHEDULER_MODE_HIDDEN);
+          try{
+            PRC_DEBUG.log("backgroundScheduler(enabled)", { step: hiddenStepFloat });
+          }catch(e){}
         }
-        renderAll();
+        return;
+      }
+
+      if (!document.hidden){
+        __handleVisiblePlaybackResume();
       }
       return;
     }
 
     if (document.hidden){
       if (!isPlaying) return;
-      __resumeStepOnVisible = __normStepIndex(stepFloatFromTransport());
+      __resumeStepOnVisible = stepFloatFromTransport();
       __autoPausedByHidden = true;
       stopStablePlayback();
       isPlaying = false;
@@ -7970,7 +8202,7 @@ function hitNote(mx,my){
 
   function tickUI(ts){
     const nowTs = ts ?? performance.now();
-    if (__drumRebuildPending){
+    if (__drumRebuildPending && __schedulerMode !== __SCHEDULER_MODE_HIDDEN){
       __drumRebuildPending = false;
       try{
         buildDrumSynths();
